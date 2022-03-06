@@ -1,0 +1,36 @@
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_360_association.txt ./../../dataset/360 ./settings/TUM/TUM1.yaml 360_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_desk_association.txt ./../../dataset/desk ./settings/TUM/TUM1.yaml desk_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_desk2_association.txt ./../../dataset/desk2 ./settings/TUM/TUM1.yaml desk2_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_plant_association.txt ./../../dataset/plant ./settings/TUM/TUM1.yaml plant_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_room_association.txt ./../../dataset/room ./settings/TUM/TUM1.yaml room_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_xyz_association.txt ./../../dataset/xyz ./settings/TUM/TUM1.yaml xyz_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_rpy_association.txt ./../../dataset/rpy ./settings/TUM/TUM1.yaml rpy_connum_800400.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+
+
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_desk2_association.txt ./../../dataset/desk2 ./settings/TUM/TUM1.yaml desk2_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_plant_association.txt ./../../dataset/plant ./settings/TUM/TUM1.yaml plant_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_360_association.txt ./../../dataset/360 ./settings/TUM/TUM1.yaml 360_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_rpy_association.txt ./../../dataset/rpy ./settings/TUM/TUM1.yaml rpy_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_room_association.txt ./../../dataset/room ./settings/TUM/TUM1.yaml room_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_xyz_association.txt ./../../dataset/xyz ./settings/TUM/TUM1.yaml xyz_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn1_10kn_meta.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+
+
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_desk2_association.txt ./../../dataset/desk2 ./settings/TUM/TUM1.yaml desk2_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_plant_association.txt ./../../dataset/plant ./settings/TUM/TUM1.yaml plant_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_360_association.txt ./../../dataset/360 ./settings/TUM/TUM1.yaml 360_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_rpy_association.txt ./../../dataset/rpy ./settings/TUM/TUM1.yaml rpy_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_room_association.txt ./../../dataset/room ./settings/TUM/TUM1.yaml room_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_xyz_association.txt ./../../dataset/xyz ./settings/TUM/TUM1.yaml xyz_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_desk2_association.txt ./../../dataset/desk2 ./settings/TUM/TUM1.yaml desk2_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_plant_association.txt ./../../dataset/plant ./settings/TUM/TUM1.yaml  360_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_rpy_association.txt ./../../dataset/rpy ./settings/TUM/TUM1.yaml rpy_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_room_association.txt ./../../dataset/room ./settings/TUM/TUM1.yaml room_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_xyz_association.txt ./../../dataset/xyz ./settings/TUM/TUM1.yaml xyz_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+
+
+
+plant_4ROI_OR_foreground_inner55outer99_without_slidingextent_resam_20kn_10kn_meta_nlap_lrt.txt ./Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt
+./build/ICPORBVO_example ./settings/TUM/associations/rs_rgb_360_association.txt ./../../dataset/360 ./settings/TUM/TUM1.yaml
+
+

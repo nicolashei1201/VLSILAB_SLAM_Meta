@@ -22,10 +22,10 @@ set(EIGEN_INCLUDE_DIRS /home/jyli/projects/ICPORB_VO/Thirdparty/Eigen/eigen3)
 #	/home/jyli/projects/ICPORB_VO/Thirdparty/g2o/include
 #	)
 set(ICPORBVO_INCLUDE_DIR 
-	/home/jjhu/Desktop/jjhu/jy_code/ICPORB_VO/
-	/home/jjhu/Desktop/jjhu/jy_code/ICPORB_VO/include
-	/home/jjhu/Desktop/jjhu/jy_code/ICPORB_VO/Thirdparty/ORB_SLAM2/include
-	/home/jjhu/Desktop/jjhu/jy_code/ICPORB_VO/Thirdparty/g2o/include
+	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO/
+	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO/include
+	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO/Thirdparty/ORB_SLAM2/include
+	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO//Thirdparty/g2o/include
 	)
 file(GLOB ICPORBVO_LIBRARY 
 	/home/jyli/projects/ICPORB_VO/lib/*.so

@@ -113,7 +113,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb)
 }
 const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, const cv::Mat& depth)
 {
-  
+  std::cout<<"Track!!!\n";
   cv::Mat rgb1 = rgb;
   cv::Mat rgb2 = rgb;
   cv::Mat rgb3 = rgb;

@@ -269,6 +269,7 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   }
   
   //get ICP pose
+  std::cout<<"get ICP pose\n";
   auto TICP = fICP.get();
 
   //convert Matrix4d to Isometry
@@ -338,7 +339,7 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   
   //get ICP pose
   auto TICP = fICP.get();
-
+  std::cout<<"get ICP pose\n";
   //convert Matrix4d to Isometry
   Pose PICP(TICP);
 

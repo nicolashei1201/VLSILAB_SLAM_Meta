@@ -126,6 +126,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const T
 const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const cv::Mat& depth, const cv::Mat& rgb, const TargetCloud& tgtCloud, const Transform& initialGuess) {
 
   //initial parameters
+  std::cout<<"Meta ICP\n";
   rtSE3 = initialGuess;
   rtSE3_1 = initialGuess;
   rtSE3_2 = initialGuess;

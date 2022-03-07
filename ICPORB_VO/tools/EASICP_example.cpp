@@ -32,6 +32,5 @@ int main(int argc,  char *argv[])
   icp_vo.Track(target_depth, 1);
   
   std::cout << icp_vo.GetPoses().back() << std::endl;
-
   return 0; 
 }

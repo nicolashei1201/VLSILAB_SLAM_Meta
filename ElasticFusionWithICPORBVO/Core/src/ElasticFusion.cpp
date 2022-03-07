@@ -313,6 +313,7 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         TICK("odom");
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, filtered_cloud.leftCols<3>().cast<double>(),timestamp);
 //printf("odom");
+        std::cout<<"Increment\n";
         icporb_vo->IncrementalTrack(cvRGB, cvDepth,timestamp);
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, timestamp);
         TOCK("odom");

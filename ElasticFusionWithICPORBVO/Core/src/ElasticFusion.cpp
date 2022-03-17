@@ -93,10 +93,10 @@ ElasticFusion::ElasticFusion(const int timeDelta,
     createFeedbackBuffers();
 
     useICPORB_VO=true;
-    useICPDepthAlone=false;
+    useICPDepthAlone=true;
     icporb_vo = new ICPORB_VO(
 		    "/home/jyli/projects/ICPORB_VO/Thirdparty/ORB_SLAM2/Vocabulary/ORBvoc.txt", 
-		    "/home/jyli/projects/ICPORB_VO/settings/TUM/TUM1Elastic.yaml");
+		    "/home/jjhu/Desktop/hei/cy_code/ICPORB_VO/settings/TUM/TUM1Elastic.yaml");
     std::string filename = fileName;
     filename.append(".freiburg");
 
@@ -308,20 +308,25 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
       if (useICPORB_VO) {
         cv::Mat cvDepth(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_16UC1, (void*)depth);
         cv::Mat cvRGB(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_8UC3, (void*)rgb);
+        cvDepth.convertTo(cvDepth, CV_16UC1, 1);
         // Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor> filtered_cloud(Resolution::getInstance().numPixels(),4);
         // fillInForICP.vertexTexture.texture->Download(filtered_cloud.data(), GL_RGBA, GL_FLOAT);
         TICK("odom");
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, filtered_cloud.leftCols<3>().cast<double>(),timestamp);
 //printf("odom");
         std::cout<<"Increment\n";
-        icporb_vo->IncrementalTrack(cvRGB, cvDepth,timestamp);
+        icporb_vo->IncrementalTrack(cvRGB, cvDepth,(double)timestamp/1000);
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, timestamp);
+        std::cout<<"Increment End\n";
         TOCK("odom");
         trackingOk = icporb_vo->IsValid();
         if (useICPDepthAlone) {
-          currPose = currPose * icporb_vo->GetRelativePose(0).matrix().cast<float>();
-          // currPose = icporb_vo->GetCurrentPose(0).matrix().cast<float>();
+            std::cout<<"Only ICP!!\n";
+            currPose = lastPose * icporb_vo->GetRelativePose(0).matrix().cast<float>();
+           //std::cout<<"\nRelative Pose:\n"<<icporb_vo->GetRelativePose(0).matrix().cast<float>()<<"\n";
+           //currPose = icporb_vo->GetCurrentPose(1).matrix().cast<float>();
         } else {
+        
           currPose = currPose * icporb_vo->GetRelativePose(1).matrix().cast<float>();
           // currPose = icporb_vo->GetCurrentPose(1).matrix().cast<float>();
         }

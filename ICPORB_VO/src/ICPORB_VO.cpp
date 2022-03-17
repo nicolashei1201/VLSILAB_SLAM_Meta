@@ -13,7 +13,7 @@
 
 *_._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._.*/
 
-#include <ICPORB_VO.h>
+#include "ICPORB_VO.h"
 
 ICPORB_VO::ICPORB_VO (const std::string& strVOC, const std::string& strSettings)
 {
@@ -269,9 +269,9 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   }
   
   //get ICP pose
-  std::cout<<"get ICP pose\n";
+  
   auto TICP = fICP.get();
-
+  //std::cout<<"ICP Pose:"<<TICP<<"\n";
   //convert Matrix4d to Isometry
   Pose PICP(TICP);
 
@@ -291,7 +291,7 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   }
 }
 void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
-  
+  //std::cout<<depth;
   auto fORB = std::async(
     std::launch::async,
     &ORB_SLAM2::System::TrackRGBD,
@@ -309,9 +309,13 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
 	std::cref(rgb),
     std::cref(timestamp)
   );
-
+  std::cout<<"depth:\n";
+  for(int i = 0;i<10;i++){
+    std::cout<<((int16_t*)depth.data)[i]<<"\n";
+  }
   // //get ORB pose
   auto TORB = fORB.get();
+  //std::cout<<"get ORB pose\n"<<TORB;
   Pose PORB_inv  = Pose::Identity();
   //convert cv Mat to Pose
   bool IsValidORB = true;
@@ -339,14 +343,15 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   
   //get ICP pose
   auto TICP = fICP.get();
-  std::cout<<"get ICP pose\n";
+  
   //convert Matrix4d to Isometry
   Pose PICP(TICP);
-
+  std::cout<<"get ICP pose\n"<<TICP;
   //fuse both trajectory
   posesORB.push_back(PORB_inv.inverse());
   posesICP.push_back(PICP);
-
+  auto orbpose = PORB_inv.inverse();
+  std::cout<<"\nget ORB pose\n"<<TORB.inv();
   int n = 2;
   if (posesORB.size() < n) {
     n = posesORB.size();
@@ -356,5 +361,36 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
     lastPose = Pose::Identity();
   } else {
     Fuse(n, IsValidORB, pICPVO->IsValid());
+    //lastPose = currentPose;
+    //currentPose = PICP;
+  }
+}
+void ICPORB_VO::IncrementalTrackMeta(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
+  auto fICP = std::async(
+    std::launch::async, 
+    //prevent ambiguity of overload function by explicit casting
+    (const ICP_VO::Pose&(ICP_VO::*)(const cv::Mat&, const cv::Mat& , const double& ))(&ICP_VO::Track),
+    pICPVO,
+    std::cref(depth),
+	std::cref(rgb),
+    std::cref(timestamp)
+  );
+  
+  //get ICP pose
+  auto TICP = fICP.get();
+  
+  std::cout<<"get ICP pose\n"<<TICP;
+  //convert Matrix4d to Isometry
+  Pose PICP(TICP);
+
+  //fuse both trajectory
+  posesICP.push_back(PICP);
+
+  if (posesICP.size() == 1) {
+    currentPose = Pose::Identity();
+    lastPose = Pose::Identity();
+  } else {
+    lastPose = currentPose;
+    currentPose = PICP;
   }
 }

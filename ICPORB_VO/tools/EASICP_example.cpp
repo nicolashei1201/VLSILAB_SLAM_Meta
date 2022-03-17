@@ -28,6 +28,7 @@ int main(int argc,  char *argv[])
   
   cv::Mat source_depth = cv::imread(argv[1], -1);
   cv::Mat target_depth = cv::imread(argv[2], -1);
+  std::cout<<source_depth<<"\n";
   icp_vo.Track(source_depth, 0);
   icp_vo.Track(target_depth, 1);
   

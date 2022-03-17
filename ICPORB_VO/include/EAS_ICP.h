@@ -75,6 +75,7 @@ public:
 private:
  
   //basic methods
+  double mDepthMapFactor;
   Transform ConstructSE3(const Eigen::Vector<Scalar, 6> rt6D);
   bool CheckConverged(const Eigen::Vector<Scalar, 6>& rt6D);
   std::unique_ptr<CurrentCloudrgb> keycloud;

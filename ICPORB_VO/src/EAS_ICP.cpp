@@ -29,6 +29,7 @@ EAS_ICP::EAS_ICP( const std::string& strSettings){
   width  = FsSettings["Camera.width"];
   height = FsSettings["Camera.height"];
   pixelSize=width*height;
+  mDepthMapFactor = FsSettings["DepthMapFactor"];
   fx = FsSettings["Camera.fx"];
   fy = FsSettings["Camera.fy"];
   cx = FsSettings["Camera.cx"];
@@ -617,7 +618,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth_before20, tgtCloud)) {
-			std::cout<<"jump1"<<std::endl;
+			//std::cout<<"jump1"<<std::endl;
 			meanweight1 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -637,7 +638,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth, tgtCloud)) {
-			std::cout<<"jump1"<<std::endl;
+			//std::cout<<"jump1"<<std::endl;
 			meanweight1 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -652,13 +653,13 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
 		}
 		}
-		std::cout<<"cloudnumber"<<std::endl;
-		std::cout<<mSrcCloud3.rows()<<std::endl;
+		//std::cout<<"cloudnumber"<<std::endl;
+		//std::cout<<mSrcCloud3.rows()<<std::endl;
 
 		meanweight1 = 1;
 	}
-	std::cout<<"corrs1num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs1num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	//2nd set of correspondences
 	/*int cnt2[mSrcCloud4.rows()];
     for(int i=0; i<mSrcCloud4.rows(); i++)
@@ -701,7 +702,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)) {
-			std::cout<<"jump2"<<std::endl;
+			//std::cout<<"jump2"<<std::endl;
 			meanweight2 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -721,7 +722,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)) {
-			std::cout<<"jump2"<<std::endl;
+			//std::cout<<"jump2"<<std::endl;
 			meanweight2 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -739,8 +740,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 
 		meanweight2 = 1;
 	}
-	std::cout<<"corrs2num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs2num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	//3rd set of correspondences
 	/*int cnt3[mSrcCloud1.rows()];
 
@@ -784,13 +785,13 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-			std::cout<<"jump3"<<std::endl;
+			//std::cout<<"jump3"<<std::endl;
 			meanweight3 =0;
 		//break; // when correspondence size less than 6
 		}
 		if (MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-		std::cout<<"cnttrans3"<<std::endl;
-		std::cout<<cnttrans3<<std::endl;
+		//std::cout<<"cnttrans3"<<std::endl;
+		//std::cout<<cnttrans3<<std::endl;
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
@@ -808,7 +809,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
-			std::cout<<"jump3"<<std::endl;
+			//std::cout<<"jump3"<<std::endl;
 			meanweight3 =0;
 		//break; // when correspondence size less than 6
 		}
@@ -826,8 +827,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		meanweight3 = 1;
 		}
 	}
-	std::cout<<"corrs3num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs3num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	//4th set of correspondences
 	/*int cnt4[mSrcCloud2.rows()];
     for(int i=0; i<mSrcCloud2.rows(); i++)
@@ -870,7 +871,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
-			std::cout<<"jump4"<<std::endl;
+			//std::cout<<"jump4"<<std::endl;
 			meanweight4 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -892,7 +893,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
-			std::cout<<"jump4"<<std::endl;
+			//std::cout<<"jump4"<<std::endl;
 			meanweight4 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -906,13 +907,13 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		{
 			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
 		}
-		std::cout<<"cnttrans4"<<std::endl;
-		std::cout<<cnttrans4<<std::endl;
+		//std::cout<<"cnttrans4"<<std::endl;
+		//std::cout<<cnttrans4<<std::endl;
 		meanweight4 = 1;
 		}
 	}	
-	std::cout<<"corrs4num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs4num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	// ++ meta task loop end
 	// ++ pose fusion = mean(all tasks' rt6D)
 	
@@ -1479,20 +1480,20 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
 		}
 		}
-		std::cout<<"cloudnumber"<<std::endl;
-		std::cout<<mSrcCloud3.rows()<<std::endl;
+		//std::cout<<"cloudnumber"<<std::endl;
+		//std::cout<<mSrcCloud3.rows()<<std::endl;
 
 		meanweight1 = 1;
 	}
-	std::cout<<"corrs1num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs1num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	
    
 	if(iteration_loop2<=iteration_divide)
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)) {
-			std::cout<<"jump2"<<std::endl;
+			//std::cout<<"jump2"<<std::endl;
 			meanweight2 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -1512,7 +1513,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)) {
-			std::cout<<"jump2"<<std::endl;
+			//std::cout<<"jump2"<<std::endl;
 			meanweight2 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -1530,8 +1531,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 
 		meanweight2 = 1;
 	}
-	std::cout<<"corrs2num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs2num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	//3rd set of correspondences
 
     
@@ -1539,13 +1540,13 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-			std::cout<<"jump3"<<std::endl;
+			//std::cout<<"jump3"<<std::endl;
 			meanweight3 =0;
 		//break; // when correspondence size less than 6
 		}
 		if (MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-		std::cout<<"cnttrans3"<<std::endl;
-		std::cout<<cnttrans3<<std::endl;
+		//std::cout<<"cnttrans3"<<std::endl;
+		//std::cout<<cnttrans3<<std::endl;
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
@@ -1563,7 +1564,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
-			std::cout<<"jump3"<<std::endl;
+			//std::cout<<"jump3"<<std::endl;
 			meanweight3 =0;
 		//break; // when correspondence size less than 6
 		}
@@ -1581,8 +1582,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		meanweight3 = 1;
 		}
 	}
-	std::cout<<"corrs3num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs3num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	//4th set of correspondences
 	
 	
@@ -1590,7 +1591,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
-			std::cout<<"jump4"<<std::endl;
+			//std::cout<<"jump4"<<std::endl;
 			meanweight4 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -1612,7 +1613,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	{
 		//match correspondence
 		if (!MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
-			std::cout<<"jump4"<<std::endl;
+			//std::cout<<"jump4"<<std::endl;
 			meanweight4 = 0;
 		//break; // when correspondence size less than 6
 		}
@@ -1626,13 +1627,13 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		{
 			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
 		}
-		std::cout<<"cnttrans4"<<std::endl;
-		std::cout<<cnttrans4<<std::endl;
+		//std::cout<<"cnttrans4"<<std::endl;
+		//std::cout<<cnttrans4<<std::endl;
 		meanweight4 = 1;
 		}
 	}	
-	std::cout<<"corrs4num"<<std::endl;
-	std::cout<<corrs.rows()<<std::endl;
+	//std::cout<<"corrs4num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
 	// ++ meta task loop end
 	// ++ pose fusion = mean(all tasks' rt6D)
 	
@@ -2024,19 +2025,22 @@ const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud) {
   //reject the points out of range and weight remind points for random sampling
   std::vector<int> remindPointInds;
   std::vector<double> weights;
+  std::cout<<"Before Point Reject\n";
   PointRejectionByDepthRangeAndGeometryWeight(cloud, edge_distance_map, nan_map | rej_map, remindPointInds, weights);
   //input:edge_distance_map, output:weights set as 1
-  
+  std::cout<<"After Point Reject\n";
   //PointRejectionByDepthRangeAndGeometryWeight2(cloud, edge_map, nan_map | rej_map, remindPointInds, weights);
 
   
   //sample depend on edge distance
   std::vector<int> EASInds;
+  std::cout<<"Before Weight Random Sampling\n";
   WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
-  
+  std::cout<<"After Weight Random Sampling\n";
   //calculate normal
+  std::cout<<"Before Calculate Normal\n";
   CalculateNormal(cloud, EASInds, mSrcCloud);
- 
+  std::cout<<"After Calculate Normal\n";
   //weighting
   kinectNoiseWeights = KinectNoiseWighting(mSrcCloud);
   
@@ -2253,7 +2257,7 @@ EAS_ICP::CurrentCloud EAS_ICP::ComputeCurrentCloud(const cv::Mat& rgb) {
          // z = ((float*)depth.data)[i]/ mDepthMapFactor;
          z = 5000.0;
       } else {
-         z = ((int16_t*)rgb.data)[i]/ 5000.0;
+         z = ((int16_t*)rgb.data)[i]/ mDepthMapFactor;
       }
       if (z == 0) {
         for (int j = 0; j < 3; ++j) {

@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     vo.IncrementalTrack(target_color, target_depth, std::stod(vstr_timestamp[i]));
 	
     Eigen::Isometry3d current_pose_iso;
-    current_pose_iso= vo.GetCurrentPose(1);
+    current_pose_iso= vo.GetCurrentPose(0);
     Eigen::Quaterniond q(current_pose_iso.rotation());
     fout << vstr_timestamp[i] << " " << current_pose_iso(0,3) 
                             << " " << current_pose_iso(1,3)
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 
 // #ifdef OUTPUT_TUM_POSE
     //show pose on screen
-    std::cout << vstr_timestamp[i] << " " << current_pose_iso(0,3) 
+    std::cout <<"\n"<< vstr_timestamp[i] << " " << current_pose_iso(0,3) 
                             << " " << current_pose_iso(1,3)
                             << " " << current_pose_iso(2,3) 
                             << " " << q.x() << " " << q.y()

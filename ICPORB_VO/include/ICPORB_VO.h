@@ -58,6 +58,7 @@ public:
    *  @param values: rgb image, depth image, timestamp
    */
   void IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
+  void IncrementalTrackMeta(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
   void Track(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
   Poses FusionTwoTrajectory();
   virtual ~ICPORB_VO ();
@@ -91,7 +92,14 @@ public:
       } else if (flag ==2 ) {
         return posesORB.rbegin()[1].inverse(), posesORB.rbegin()[0];
       } else {
-        return posesICP.rbegin()[1].inverse(), posesICP.rbegin()[0];
+        /*
+        std::cout<<"\nposes shit1:\n"<<posesORB.rbegin()[1].matrix();
+        std::cout<<"\nposes shit1_inv:\n"<<posesORB.rbegin()[1].inverse().matrix();
+        std::cout<<"\nposes shit1:\n"<<posesORB.rbegin()[1].matrix();
+        std::cout<<"\nposes shit0:\n"<<posesORB.rbegin()[0].matrix();
+        */
+       //std::cout<<"\nmult shit0:\n"<<posesICP.rbegin()[1].inverse()* posesICP.rbegin()[0].matrix();
+        return posesICP.rbegin()[1].inverse()* posesICP.rbegin()[0];
       }
     } else {
       return Pose::Identity();

@@ -28,7 +28,7 @@ set(ICPORBVO_INCLUDE_DIR
 	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO//Thirdparty/g2o/include
 	)
 file(GLOB ICPORBVO_LIBRARY 
-	/home/jyli/projects/ICPORB_VO/lib/*.so
+	/home/jjhu/Desktop/hei/cy_code/ICPORB_VO/lib/*.so
 	)
 
 include_directories(${ICPORBVO_INCLUDE_DIR})

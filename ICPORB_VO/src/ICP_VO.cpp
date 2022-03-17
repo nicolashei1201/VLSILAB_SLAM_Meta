@@ -25,6 +25,7 @@ ICP_VO::ICP_VO(const std::string& strSettings):
   //initialize parameters
   //TODO initial from settings
   mDepthMapFactor = FsSettings["DepthMapFactor"];
+  //mDepthMapFactor = 5000;
   bUseBackup = (int)(FsSettings["VO.use_backup"]);
   bPredition = (int)(FsSettings["VO.use_prediction"]);
   mThresKeyframeUpdateRot   = FsSettings["VO.keyframe_update_threshold_rot"];
@@ -37,6 +38,8 @@ ICP_VO::~ICP_VO() {
 const ICP_VO::Pose& ICP_VO::Track(const cv::Mat& depth, const cv::Mat& rgb, const double& timestamp){
   //calculate 3D points
   pCurrentCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
+  //auto pt = pCurrentCloud.get();
+  //std::cout<<pt[0]<<"\n";
   return Track(timestamp, rgb, depth);
 }
 const ICP_VO::Pose& ICP_VO::Track(const cv::Mat& depth, const double& timestamp){
@@ -113,20 +116,22 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb)
 }
 const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, const cv::Mat& depth)
 {
-  std::cout<<"Track!!!\n";
+  std::cout<<"Track!!!!\n";
   cv::Mat rgb1 = rgb;
   cv::Mat rgb2 = rgb;
   cv::Mat rgb3 = rgb;
-  
+  //std::cout<<"Cloud:\n"<<*pCurrentCloud<<"\n";
   //initialize VO if first frame, or track current frame
   if (mPoses.size() == 0) {
     rpK2C = RelativePose::Identity();
     pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity());
    
 	mPoses.push_back(Pose::Identity());
-	keyframedepthmap = depth;
+	keyframedepthmap = depth * mDepthMapFactor/1000;
+  //std::cout<<"keyframe:"<<keyframedepthmap<<"\n";
 	
-  } else {
+  } 
+  else {
     //calculate prediction
     RelativePose pred, predK2C;
 
@@ -165,7 +170,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
       pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, mPoses.back());
       //std::cout<<"keyframeend"<<std::endl;
 	  rpK2C = RelativePose::Identity();
-	  keyframedepthmap = depth;
+	  keyframedepthmap = depth * mDepthMapFactor/1000;
     }
     
     //backup cloud
@@ -268,10 +273,12 @@ ICP_VO::CurrentCloud ICP_VO::ComputeCurrentCloud(const cv::Mat& depth) {
       int i = n*width +m;
       Scalar z=0;
       if (depth.type() == CV_32FC1) {
-         // z = ((float*)depth.data)[i]/ mDepthMapFactor;
-         z = mDepthMapFactor;
+          z = ((float*)depth.data)[i]/ mDepthMapFactor;
+         //z = mDepthMapFactor;
+         //std::cout<<"DepthFac:"<<mDepthMapFactor<<"\n";
       } else {
          z = ((int16_t*)depth.data)[i]/ mDepthMapFactor;
+         //std::cout<<"DepthFac2:"<<mDepthMapFactor<<"\n";
       }
       if (z == 0) {
         for (int j = 0; j < 3; ++j) {

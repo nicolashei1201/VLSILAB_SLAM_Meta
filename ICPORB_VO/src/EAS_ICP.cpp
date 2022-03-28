@@ -17,6 +17,7 @@
 #include "pcl_normal.hpp"
 #include <Eigen/SVD>
 #include <Eigen/Eigenvalues>
+#include <Eigen/Dense>
 #include <ctime>
 #include <time.h>
 #include <stdio.h>
@@ -96,7 +97,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const T
     t_p1 = clock();
     Eigen::Vector<Scalar, 6> rt6D;
     rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-    
+    rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
     //convert 6D vector to SE3
     Transform iterRtSE3;
     iterRtSE3 = ConstructSE3(rt6D);
@@ -626,11 +627,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all));
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 		}
 		}
 	}
@@ -646,11 +647,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
 		}
 		}
 		//std::cout<<"cloudnumber"<<std::endl;
@@ -710,11 +711,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 		}
 		}
 	}
@@ -730,11 +731,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
 		}
 		}	
 
@@ -795,11 +796,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
 		}	
 		else
 		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 		}
 		meanweight3 = 1;
 		}
@@ -818,11 +819,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
 		}	
 		else 
 		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
 		}
 		meanweight3 = 1;
 		}
@@ -879,11 +880,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all));
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 		}
 
 		meanweight4 = 1;
@@ -901,11 +902,11 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		//get iteration transformation by minimizing p2pl error metric
 		if(Useedgeaware==0)
 		{
-			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
 		}
 		else
 		{
-			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
 		}
 		//std::cout<<"cnttrans4"<<std::endl;
 		//std::cout<<cnttrans4<<std::endl;
@@ -2402,7 +2403,6 @@ bool EAS_ICP::MatchingByProject2DAndWalk(const SourceCloud& srcCloud, const Targ
   return corrs.rows() >=6;
 }
 
-
 Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetric(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights) {
   //solve Ax=b
   //calculate b
@@ -2439,7 +2439,87 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetric(const Sourc
   }
   return ret;
 }
+Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewton(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights) {
+  //solve Ax=b
+  //calculate b
+  //auto b = (tgtCloud - srcCloud.leftCols(3)).transpose().cwiseProduct(srcCloud.rightCols(3).transpose()).colwise().sum().transpose();
+  	Eigen::Matrix<EAS_ICP::Scalar,Eigen::Dynamic, 7> JacoPre(tgtCloud.rows(), 7);
+  	JacoPre.leftCols(3) = srcCloud.rightCols(3);
 
+	for (int i = 0; i < tgtCloud.rows(); ++i) {
+    Eigen::Vector3<Scalar> s = srcCloud.row(i).head(3);
+	Eigen::Vector3<Scalar> n = srcCloud.row(i).tail(3);
+	Eigen::Vector3<Scalar> d = tgtCloud.row(i).tail(3);
+	Eigen::Vector3<Scalar> dist = s-d;
+    JacoPre.row(i).segment(3,3) = s.cross(n);
+	JacoPre.row(i).tail(1)(0) = dist.dot(n);
+  	}
+	Eigen::Matrix<EAS_ICP::Scalar,6, 6,Eigen::RowMajor> A_icp = Eigen::MatrixXd::Zero(6, 6);
+	Eigen::Matrix<EAS_ICP::Scalar, 6, 1> b_icp = Eigen::MatrixXd::Zero(6, 1);
+
+	Eigen::Matrix<EAS_ICP::Scalar,6, 6,Eigen::RowMajor> Temp;
+	Eigen::Matrix<EAS_ICP::Scalar, 6, 1> Temp_b;
+
+	for (int i = 0; i < tgtCloud.rows(); ++i) {
+		double a,b,c,d,e,f,g;
+		a = JacoPre.row(i)(0);
+		b = JacoPre.row(i)(1);
+		c = JacoPre.row(i)(2);
+		d = JacoPre.row(i)(3);
+		e = JacoPre.row(i)(4);
+		f = JacoPre.row(i)(5);
+		g = JacoPre.row(i)(6);
+
+		Temp(0,0) = a * a;
+		Temp(0,1) = Temp(1,0) = a * b;
+		Temp(0,2) = Temp(2,0) = a * c;
+		Temp(0,3) = Temp(3,0) = a * d;
+		Temp(0,4) = Temp(4,0) = a * e;
+		Temp(0,5) = Temp(5,0) = a * f;
+
+		Temp(1,1) = b * b;
+		Temp(1,2) = Temp(2,1) = b * c;
+		Temp(1,3) = Temp(3,1) = b * d;
+		Temp(1,4) = Temp(4,1) = b * e;
+		Temp(1,5) = Temp(5,1) = b * f;
+
+		Temp(2,2) = c * c;
+		Temp(2,3) = Temp(3,2) = c * d;
+		Temp(2,4) = Temp(4,2) = c * e;
+		Temp(2,5) = Temp(5,2) = c * f;
+
+		Temp(3,3) = d * d;
+		Temp(3,4) = Temp(4,3) = d * e;
+		Temp(3,5) = Temp(5,3) = d * f;
+
+		Temp(4,4) = e * e;
+		Temp(4,5) = Temp(5,4) = e * f;
+
+		Temp(5,5) = f * f;
+
+		Temp_b(0,0) = a * g;
+		Temp_b(1,0) = b * g;
+		Temp_b(2,0) = c * g;
+		Temp_b(3,0) = d * g;
+		Temp_b(4,0) = e * g;
+		Temp_b(5,0) = f * g;
+		A_icp += Temp;
+		b_icp += Temp_b;
+  	}
+	Eigen::Vector<EAS_ICP::Scalar, 6> ret;
+	ret = A_icp.ldlt().solve(b_icp);
+	/*
+	std::cout<<"\n-------------------------\n"; 
+	std::cout<<"src:\n"<<srcCloud.row(0)<<"\n";
+	std::cout<<"tgt:\n"<<tgtCloud.row(0)<<"\n";
+	std::cout<<"Jaco:\n"<<JacoPre.row(0)<<"\n";
+	std::cout<<"A_icp:\n"<<A_icp<<"\n";
+	std::cout<<"b_icp:\n"<<b_icp<<"\n";
+	std::cout<<"result:\n"<<ret<<"\n";
+	std::cout<<"\n-------------------------\n";
+	*/
+  	return ret;
+}
 //reference linear least-square Optimization of p2pl ICP
 EAS_ICP::Transform EAS_ICP::ConstructSE3(const Eigen::Vector<Scalar, 6> rt){
   Transform ret = Transform::Identity();

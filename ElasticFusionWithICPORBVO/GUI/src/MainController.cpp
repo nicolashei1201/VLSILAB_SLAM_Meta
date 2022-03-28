@@ -310,7 +310,6 @@ void MainController::run()
 
             Eigen::Matrix4f currPose = eFusion->getCurrPose();
             Eigen::Matrix3f currRot = currPose.topLeftCorner(3, 3);
-
             Eigen::Quaternionf currQuat(currRot);
             Eigen::Vector3f forwardVector(0, 0, 1);
             Eigen::Vector3f upVector(0, iclnuim ? 1 : -1, 0);

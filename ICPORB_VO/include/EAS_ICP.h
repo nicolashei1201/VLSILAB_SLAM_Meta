@@ -105,6 +105,7 @@ private:
   bool MatchingByProject2DAndWalk(const SourceCloud& srcCloud, const TargetCloud& tgtCloud);
 
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetric(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
+  Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetricGaussianNewton(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
   //basic datas
   Transform rtSE3;
   Transform rtSE3_1;

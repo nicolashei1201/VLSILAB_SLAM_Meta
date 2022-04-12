@@ -20,6 +20,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <unistd.h>
+
+#define FLT_EPSILON ((float)1.19209290E-07F)
 class EAS_ICP
 {
 public:
@@ -31,6 +33,8 @@ public:
   using SourceCloud = Eigen::Matrix<Scalar, Eigen::Dynamic, 6, Eigen::RowMajor>;
   using TargetCloud = Eigen::Matrix<Scalar, Eigen::Dynamic, 3, Eigen::RowMajor>;
   using Transform = Eigen::Matrix<Scalar, 4, 4, Eigen::RowMajor>;
+  using A_term = Eigen::Matrix<Scalar,6, 6,Eigen::RowMajor>;
+  using b_term =  Eigen::Matrix<Scalar, 6, 1>;
   /*! Constructor of EAS_ICP 
    *
    *  Initialize the parameters.
@@ -59,6 +63,7 @@ public:
    */
   const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
   const Transform& Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess);
+  void RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
   /*! Check ICP valid or not
    *
    *  It depends on sliding extent, detailed in JY's thesis
@@ -69,9 +74,14 @@ public:
   bool isValid(){
     return valid;
   }
+  void computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy);
  
   int width, height, pixelSize;
   double fx, fy, cx, cy;
+  cv::Mat last_rgb;
+  cv::Mat last_depth;
+  
+  std::unique_ptr<CurrentCloud> pLastCloud;
 private:
  
   //basic methods
@@ -106,6 +116,7 @@ private:
 
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetric(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetricGaussianNewton(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
+  Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetricGaussianNewtonRGB(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last,Transform resultRt, TargetCloud& LastCloud);
   //basic datas
   Transform rtSE3;
   Transform rtSE3_1;
@@ -118,7 +129,6 @@ private:
   int max_iters;
   int stride, sampling_size;
   double max_depth, min_depth;
-
   //sampling datas
   int random_seed; //for robust tum evaluation
   double edge_threshold;

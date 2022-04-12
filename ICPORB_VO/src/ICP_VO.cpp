@@ -14,7 +14,9 @@
 *_._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._._.*/
 
 #include "ICP_VO.h"
-
+#include <Eigen/SVD>
+#include <Eigen/Eigenvalues>
+#include <Eigen/Dense>
 ICP_VO::ICP_VO(const std::string& strSettings):
   pKeyFrame(nullptr),
   pCurrentCloud(nullptr)
@@ -125,7 +127,6 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
   if (mPoses.size() == 0) {
     rpK2C = RelativePose::Identity();
     pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity());
-   
 	mPoses.push_back(Pose::Identity());
 	keyframedepthmap = depth * mDepthMapFactor/1000;
   //std::cout<<"keyframe:"<<keyframedepthmap<<"\n";
@@ -146,7 +147,6 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
 
     //perform ICP
     rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C);
-
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
       pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back());
@@ -179,6 +179,8 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
       backupCloud.second = std::move(pCurrentCloud);
     } 
   }
+  pICP->last_rgb = rgb;
+  pICP->pLastCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
   return mPoses.back();
 }
 
@@ -238,6 +240,86 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp)
   return mPoses.back();
 }
 
+const ICP_VO::Pose& ICP_VO::TrackJoint(const cv::Mat& depth, const cv::Mat& rgb, const double& timestamp){
+  std::cout<<"Doing Cool things.\n";
+
+  pCurrentCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
+    //initialize VO if first frame, or track current frame
+  
+  ICP_VO::RGB dIdx;
+  ICP_VO::RGB dIdy;
+  computeDerivativeImages(rgb, dIdx, dIdy);
+  if (mPoses.size() == 0) {
+    std::cout<<"first frame haha\n";
+    rpK2C = RelativePose::Identity();
+    pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity());
+    mPoses.push_back(Pose::Identity());
+    lastRGB = rgb;
+    pLastCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
+  } else {
+    //calculate prediction
+    RelativePose pred, predK2C;
+
+    //guess the initial pose
+    if (bPredition && mPoses.size() > 1) {
+      pred = mPoses.rbegin()[0].inverse()* mPoses.rbegin()[1];
+      predK2C = pred*rpK2C;
+    } else {
+      pred = RelativePose::Identity();
+      predK2C = RelativePose::Identity();
+    }
+    //perform ICP
+    Eigen::Matrix<EAS_ICP::Scalar,6, 6,Eigen::RowMajor> A_rgb = Eigen::MatrixXd::Zero(6, 6);
+    Eigen::Matrix<EAS_ICP::Scalar, 6, 1> b_rgb = Eigen::MatrixXd::Zero(6, 1);
+
+
+    pICP->RGBJacobianGet(dIdx, dIdy, depth, rgb, lastRGB, *pCurrentCloud, predK2C, A_rgb, b_rgb, *pLastCloud);
+
+    //Eigen::Vector<EAS_ICP::Scalar, 6> retRGB;
+	  //retRGB = A_rgb.ldlt().solve(b_rgb);
+    //std::cout<<"\n\nA_rgb: "<<A_rgb<<"\n\n";
+    //std::cout<<"\n\nb_rgb: "<<b_rgb<<"\n\n";
+
+    Eigen::Vector<EAS_ICP::Scalar, 6> ret2;
+	  ret2 = A_rgb.ldlt().solve(b_rgb);
+    std::cout<<"\nRGB_pose: "<<ret2<<"\n";
+    rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
+
+    
+    //check ICP valid
+    if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back());
+      RelativePose rpB2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, pred);
+      if (pICP->isValid()) {
+        rpK2C = rpB2C;
+      } else {
+        rpK2C = pred;
+      }
+    } else if(bUseBackup && !pICP->isValid() && backupCloud.second != nullptr){
+      rpK2C = pred;
+    }
+
+    //calculate current pose from keypose
+    Pose currentPose = pKeyFrame->pose * (rpK2C.inverse());
+    pICP->RGBJacobianGet(dIdx, dIdy, depth, rgb, lastRGB, *pCurrentCloud, (rpK2C.inverse()), A_rgb, b_rgb, *pLastCloud);
+    mPoses.push_back(currentPose);
+
+    //check update keyframe
+    if (CheckUpdateKeyFrame(rpK2C)) {
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, mPoses.back());
+      rpK2C = RelativePose::Identity();
+    }
+    
+    //backup cloud
+    if (bUseBackup) {
+      backupCloud.first = timestamp;
+      backupCloud.second = std::move(pCurrentCloud);
+    }
+    lastRGB = rgb;
+    pLastCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
+  }
+  return mPoses.back();
+}
 bool ICP_VO::CheckUpdateKeyFrame(const RelativePose& rtSE3) {
   Eigen::Vector<Scalar, 6> rt;
   rt = TranslationAndEulerAnglesFromSe3(rtSE3);
@@ -369,3 +451,22 @@ ICP_VO::CurrentCloud ICP_VO::ComputeCurrentCloud(const cv::Mat& depth) {
   return ret;
 }
 
+void ICP_VO::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy){
+
+  float gsx3x3[9] = {0.52201,  0.00000, -0.52201,
+                   0.79451, -0.00000, -0.79451,
+                   0.52201,  0.00000, -0.52201};
+
+  float gsy3x3[9] = {0.52201, 0.79451, 0.52201,
+                     0.00000, 0.00000, 0.00000,
+                    -0.52201, -0.79451, -0.52201};
+
+  cv::Mat intensity;
+  cv::cvtColor(rgb, intensity, cv::COLOR_BGR2GRAY);
+  
+  cv::Mat kernelX(3, 3, CV_32F, gsx3x3);
+  cv::Mat kernelY(3, 3, CV_32F, gsy3x3);
+  cv::filter2D( intensity, dIdx, -1 , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  cv::filter2D( intensity, dIdy, -1 , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+
+}

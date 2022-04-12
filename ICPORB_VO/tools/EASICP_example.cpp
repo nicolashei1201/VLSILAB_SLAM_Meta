@@ -20,17 +20,19 @@
 
 int main(int argc,  char *argv[])
 {
-  if (argc != 4) {
+  if (argc != 6) {
     std::cout << "./build/rgbd_tum path_to_source_depth_file path_to_target_depth_file path_to_setting " << std::endl;
     return 1;
   }
-  ICP_VO icp_vo(argv[3]);
+  ICP_VO icp_vo(argv[5]);
   
   cv::Mat source_depth = cv::imread(argv[1], -1);
   cv::Mat target_depth = cv::imread(argv[2], -1);
+  cv::Mat source_rgb = cv::imread(argv[3], -1);
+  cv::Mat target_rgb = cv::imread(argv[4], -1);
   //std::cout<<source_depth<<"\n";
-  icp_vo.Track(source_depth, 0);
-  icp_vo.Track(target_depth, 1);
+  icp_vo.TrackJoint(source_depth,source_rgb, 0);
+  icp_vo.TrackJoint(target_depth,target_rgb, 1);
   
   std::cout << icp_vo.GetPoses().back() << std::endl;
   return 0; 

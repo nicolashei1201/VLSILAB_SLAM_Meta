@@ -21,7 +21,8 @@
 #include <vector>
 #include <memory>
 #include <iostream> 
-#include <fstream> 
+#include <fstream>
+#include <Eigen/Core> 
 class ICP_VO
 {
 public:
@@ -33,6 +34,7 @@ public:
   using Pose = Eigen::Matrix<Scalar, 4, 4, Eigen::RowMajor>;
   using RelativePose = Eigen::Matrix<Scalar, 4, 4, Eigen::RowMajor>;
   using Poses = std::vector<Pose, Eigen::aligned_allocator<Pose>>;
+  using RGB = cv::Mat;
 
   struct KeyFrame{
     KeyFrame(int _id,
@@ -69,6 +71,7 @@ public:
    */
   const Pose& Track(const cv::Mat& depth, const cv::Mat& rgb, const double& timestamp);
   const Pose& Track(const cv::Mat& depth, const double& timestamp);
+  const Pose& TrackJoint(const cv::Mat& depth, const cv::Mat& rgb, const double& timestamp);
   /*! Track new frame
    *
    *  Tracking camera pose by depth image
@@ -95,6 +98,8 @@ public:
     return pICP->isValid();
   }
 
+  void computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy);
+
 
 private:
   //methods
@@ -113,7 +118,9 @@ private:
   Scalar mDepthMapFactor;
   std::unique_ptr<EAS_ICP> pICP;
   std::unique_ptr<CurrentCloud> pCurrentCloud;
+  std::unique_ptr<CurrentCloud> pLastCloud;
   std::pair<double, std::unique_ptr<Cloud>> backupCloud;
   cv::Mat keyframedepthmap;
+  cv::Mat lastRGB;
 };
 #endif /* ICP_VO_H */

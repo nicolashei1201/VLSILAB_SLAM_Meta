@@ -249,6 +249,7 @@ const ICP_VO::Pose& ICP_VO::TrackJoint(const cv::Mat& depth, const cv::Mat& rgb,
   ICP_VO::RGB dIdx;
   ICP_VO::RGB dIdy;
   computeDerivativeImages(rgb, dIdx, dIdy);
+  //pICP->computeDerivativeImagesHSV(rgb, dIdx, dIdy);
   if (mPoses.size() == 0) {
     std::cout<<"first frame haha\n";
     rpK2C = RelativePose::Identity();
@@ -282,9 +283,8 @@ const ICP_VO::Pose& ICP_VO::TrackJoint(const cv::Mat& depth, const cv::Mat& rgb,
 
     Eigen::Vector<EAS_ICP::Scalar, 6> ret2;
 	  ret2 = A_rgb.ldlt().solve(b_rgb);
-    std::cout<<"\nRGB_pose: "<<ret2<<"\n";
     rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
-
+    pICP->RGBJacobianGet(dIdx, dIdy, depth, rgb, lastRGB, *pCurrentCloud, (rpK2C.inverse()), A_rgb, b_rgb, *pLastCloud);
     
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
@@ -301,7 +301,7 @@ const ICP_VO::Pose& ICP_VO::TrackJoint(const cv::Mat& depth, const cv::Mat& rgb,
 
     //calculate current pose from keypose
     Pose currentPose = pKeyFrame->pose * (rpK2C.inverse());
-    pICP->RGBJacobianGet(dIdx, dIdy, depth, rgb, lastRGB, *pCurrentCloud, (rpK2C.inverse()), A_rgb, b_rgb, *pLastCloud);
+    
     mPoses.push_back(currentPose);
 
     //check update keyframe

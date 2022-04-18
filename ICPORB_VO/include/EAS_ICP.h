@@ -64,6 +64,7 @@ public:
   const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
   const Transform& Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess);
   void RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
+  void RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
   /*! Check ICP valid or not
    *
    *  It depends on sliding extent, detailed in JY's thesis
@@ -75,19 +76,22 @@ public:
     return valid;
   }
   void computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy);
+  void computeDerivativeImagesHSV(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy);
  
   int width, height, pixelSize;
   double fx, fy, cx, cy;
   cv::Mat last_rgb;
   cv::Mat last_depth;
-  
+
   std::unique_ptr<CurrentCloud> pLastCloud;
 private:
  
   //basic methods
   double mDepthMapFactor;
   Transform ConstructSE3(const Eigen::Vector<Scalar, 6> rt6D);
+  Transform ConstructSE3_GN(const Eigen::Vector<Scalar, 6> rt6D);
   bool CheckConverged(const Eigen::Vector<Scalar, 6>& rt6D);
+  bool CheckConverged_GN(const Eigen::Vector<Scalar, 6>& rt6D);
   std::unique_ptr<CurrentCloudrgb> keycloud;
   std::unique_ptr<CurrentCloudrgb> keycloud_depth;
  CurrentCloud ComputeCurrentCloud(const cv::Mat& );
@@ -123,6 +127,8 @@ private:
   Transform rtSE3_2;
   Transform rtSE3_3;
   Transform rtSE3_4;
+  int iterations;
+  int iteration_loop2; 
   bool valid;
   double icp_converged_threshold_rot;
   double icp_converged_threshold_trans;

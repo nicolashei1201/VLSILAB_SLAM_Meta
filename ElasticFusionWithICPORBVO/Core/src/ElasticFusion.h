@@ -344,7 +344,7 @@ class ElasticFusion
         bool so3;
         bool frameToFrameRGB;
         float depthCutoff;
-
+        
 	ICPORB_VO* icporb_vo;
 	bool useICPDepthAlone;
 	bool useICPORB_VO;

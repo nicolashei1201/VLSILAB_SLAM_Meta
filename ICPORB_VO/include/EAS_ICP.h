@@ -61,7 +61,8 @@ public:
    *  @param values: source cloud, ordered target cloud, initial guess of transformation
    *  @return: transformation
    */
-  const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
+  const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
+  const Transform& Register_Ori(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
   const Transform& Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess);
   void RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
   void RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
@@ -82,6 +83,7 @@ public:
   double fx, fy, cx, cy;
   cv::Mat last_rgb;
   cv::Mat last_depth;
+  cv::Mat last_inten;
 
   std::unique_ptr<CurrentCloud> pLastCloud;
 private:

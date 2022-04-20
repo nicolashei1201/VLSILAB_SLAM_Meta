@@ -80,8 +80,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb)
     } else {
       pred = RelativePose::Identity();
       predK2C = RelativePose::Identity();
-    }
-
+    };
     //perform ICP
     rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
 
@@ -119,20 +118,34 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb)
 const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, const cv::Mat& depth)
 {
   std::cout<<"Track!!!!\n";
+  
   cv::Mat rgb1 = rgb;
   cv::Mat rgb2 = rgb;
   cv::Mat rgb3 = rgb;
+  cv::Mat inten;
+  //cv::Vec3b t = rgb.at<cv::Vec3b>(0, 1);
+  //cv::Vec3b t2 = lastRGB.at<cv::Vec3b>(0, 1);
+  //std::cout<<rgb - lastRGB;
+
+  //std::cout<<"\nt:  "<<t;
+  //std::cout<<"\nt2:  "<<t2;
+
   //std::cout<<"Cloud:\n"<<*pCurrentCloud<<"\n";
   //initialize VO if first frame, or track current frame
   if (mPoses.size() == 0) {
     rpK2C = RelativePose::Identity();
-    pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity());
+    pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity(), rgb);
 	mPoses.push_back(Pose::Identity());
 	keyframedepthmap = depth * mDepthMapFactor/1000;
+  cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
+  keyframeintenmap = inten;
+  pICP->last_rgb = rgb.clone();
+  pICP->last_depth = depth.clone();
   //std::cout<<"keyframe:"<<keyframedepthmap<<"\n";
-	
   } 
   else {
+
+
     //calculate prediction
     RelativePose pred, predK2C;
 
@@ -144,12 +157,15 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
       pred = RelativePose::Identity();
       predK2C = RelativePose::Identity();
     }
-
     //perform ICP
-    rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C);
+
+    //std::cout<<cv::sum(keyframergbmap) - cv::sum(inten);
+    cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
+    rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+    //rpK2C = pICP->Register_Ori(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C);
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
-      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back());
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back(), rgb);
       RelativePose rpB2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, pred);
       if (pICP->isValid()) {
         rpK2C = rpB2C;
@@ -167,10 +183,14 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
     //check update keyframe
     if (CheckUpdateKeyFrame(rpK2C)) {
 	 // std::cout<<"keyframestart"<<std::endl;
-      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, mPoses.back());
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, mPoses.back(), rgb);
       //std::cout<<"keyframeend"<<std::endl;
 	  rpK2C = RelativePose::Identity();
 	  keyframedepthmap = depth * mDepthMapFactor/1000;
+    keyframeintenmap = inten;
+    pICP->last_rgb = rgb.clone();
+    pICP->last_inten = inten.clone();
+    pICP->last_depth = depth.clone();
     }
     
     //backup cloud
@@ -179,7 +199,6 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
       backupCloud.second = std::move(pCurrentCloud);
     } 
   }
-  pICP->last_rgb = rgb;
   pICP->pLastCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(depth));
   return mPoses.back();
 }
@@ -285,7 +304,6 @@ const ICP_VO::Pose& ICP_VO::TrackJoint(const cv::Mat& depth, const cv::Mat& rgb,
 	  ret2 = A_rgb.ldlt().solve(b_rgb);
     rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
     pICP->RGBJacobianGet(dIdx, dIdy, depth, rgb, lastRGB, *pCurrentCloud, (rpK2C.inverse()), A_rgb, b_rgb, *pLastCloud);
-    
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
       pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back());
@@ -466,7 +484,10 @@ void ICP_VO::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat&
   
   cv::Mat kernelX(3, 3, CV_32F, gsx3x3);
   cv::Mat kernelY(3, 3, CV_32F, gsy3x3);
-  cv::filter2D( intensity, dIdx, -1 , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
-  cv::filter2D( intensity, dIdy, -1 , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  //cv::filter2D( intensity, dIdx, -1 , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  cv:: Sobel(intensity, dIdx, CV_32F, 1, 0, 1);
+  cv:: Sobel(intensity, dIdy, CV_32F, 0, 1, 1);
+  //cv::filter2D( intensity, dIdy, -1 , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  //std::cout<<dIdx;
 
 }

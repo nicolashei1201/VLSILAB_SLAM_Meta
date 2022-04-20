@@ -46,10 +46,23 @@ public:
       timestamp(_timestamp),
       pose(_pose)
     {}
+    KeyFrame(int _id,
+             KeyCloud _keyCloud,
+             double _timestamp,
+             Pose _pose,
+             cv::Mat _rgb):
+      id(_id),
+      keyCloud(_keyCloud),
+      timestamp(_timestamp),
+      pose(_pose),
+      rgb(_rgb)
+    {}
     int id;
     KeyCloud keyCloud;
     double timestamp;
     Pose pose;
+    cv::Mat rgb;
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
 public:
@@ -100,7 +113,8 @@ public:
 
   void computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy);
 
-
+  cv::Mat lastRGB;
+  cv::Mat lastDepth;
 private:
   //methods
   bool CheckUpdateKeyFrame(const RelativePose&);
@@ -112,6 +126,7 @@ private:
   Poses mPoses;
   RelativePose rpK2C;
   std::unique_ptr<KeyFrame> pKeyFrame;
+  std::unique_ptr<cv::Mat> pKeyFrameRGB;
   bool bPredition, bUseBackup;
   Scalar mThresKeyframeUpdateRot;
   Scalar mThresKeyframeUpdateTrans;
@@ -121,6 +136,6 @@ private:
   std::unique_ptr<CurrentCloud> pLastCloud;
   std::pair<double, std::unique_ptr<Cloud>> backupCloud;
   cv::Mat keyframedepthmap;
-  cv::Mat lastRGB;
+  cv::Mat keyframeintenmap;
 };
 #endif /* ICP_VO_H */

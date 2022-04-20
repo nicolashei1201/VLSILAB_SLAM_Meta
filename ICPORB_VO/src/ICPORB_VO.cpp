@@ -291,79 +291,18 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
   }
 }
 void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
-  //std::cout<<depth;
-  auto fORB = std::async(
-    std::launch::async,
-    &ORB_SLAM2::System::TrackRGBD,
-    pORBVO,
-    std::cref(rgb),
-    std::cref(depth),
-    std::cref(timestamp)
-  );
-  auto fICP = std::async(
-    std::launch::async, 
-    //prevent ambiguity of overload function by explicit casting
-    (const ICP_VO::Pose&(ICP_VO::*)(const cv::Mat&, const cv::Mat& , const double& ))(&ICP_VO::Track),
-    pICPVO,
-    std::cref(depth),
-	std::cref(rgb),
-    std::cref(timestamp)
-  );
-  std::cout<<"depth:\n";
-  for(int i = 0;i<10;i++){
-    std::cout<<((int16_t*)depth.data)[i]<<"\n";
-  }
-  // //get ORB pose
-  auto TORB = fORB.get();
-  //std::cout<<"get ORB pose\n"<<TORB;
-  Pose PORB_inv  = Pose::Identity();
-  //convert cv Mat to Pose
-  bool IsValidORB = true;
-  if (TORB.cols == 4 && TORB.rows == 4) {
-    PORB_inv(0, 0) = TORB.at<float>(0, 0);
-    PORB_inv(0, 1) = TORB.at<float>(0, 1);
-    PORB_inv(0, 2) = TORB.at<float>(0, 2);
-    PORB_inv(0, 3) = TORB.at<float>(0, 3);
-    PORB_inv(1, 0) = TORB.at<float>(1, 0);
-    PORB_inv(1, 1) = TORB.at<float>(1, 1);
-    PORB_inv(1, 2) = TORB.at<float>(1, 2);
-    PORB_inv(1, 3) = TORB.at<float>(1, 3);
-    PORB_inv(2, 0) = TORB.at<float>(2, 0);
-    PORB_inv(2, 1) = TORB.at<float>(2, 1);
-    PORB_inv(2, 2) = TORB.at<float>(2, 2);
-    PORB_inv(2, 3) = TORB.at<float>(2, 3);
-    PORB_inv(3, 0) = TORB.at<float>(3, 0);
-    PORB_inv(3, 1) = TORB.at<float>(3, 1);
-    PORB_inv(3, 2) = TORB.at<float>(3, 2);
-    PORB_inv(3, 3) = TORB.at<float>(3, 3);
-    IsValidORB=true;
-  } else {
-    IsValidORB=false;
-  }
-  
-  //get ICP pose
-  auto TICP = fICP.get();
-  
+
+  ICP_VO::Pose TICP = pICPVO->Track(depth, rgb, timestamp);
   //convert Matrix4d to Isometry
   Pose PICP(TICP);
   std::cout<<"get ICP pose\n"<<TICP;
   //fuse both trajectory
-  posesORB.push_back(PORB_inv.inverse());
   posesICP.push_back(PICP);
-  auto orbpose = PORB_inv.inverse();
-  std::cout<<"\nget ORB pose\n"<<TORB.inv();
   int n = 2;
-  if (posesORB.size() < n) {
-    n = posesORB.size();
-  }
   if (posesICP.size() == 1) {
     currentPose = Pose::Identity();
     lastPose = Pose::Identity();
-  } else {
-    Fuse(n, IsValidORB, pICPVO->IsValid());
-    //lastPose = currentPose;
-    //currentPose = PICP;
-  }
+  } 
 }
 void ICPORB_VO::IncrementalTrackMeta(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
   auto fICP = std::async(

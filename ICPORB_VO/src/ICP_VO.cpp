@@ -145,7 +145,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
   } 
   else {
 
-
+    pICP->next_depth = depth.clone();
     //calculate prediction
     RelativePose pred, predK2C;
 

@@ -856,7 +856,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	
 	Transform iterRtSE3;
 	Transform Pre_RtSE3;
-	Eigen::Vector3f Pre_trans(rt6D_L1_largest(3),rt6D_L1_largest(4),rt6D_L1_largest(5));
+	Eigen::Vector3f Pre_trans(rt6D_L1_largest(0),rt6D_L1_largest(1),rt6D_L1_largest(2));
     iterRtSE3 = ConstructSE3_GN(rt6D_L1_largest);
 	//iterRtSE3 = ConstructSE3(rt6D_L1_largest);
     //chain iterRtSE3 to rtSE3
@@ -874,6 +874,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		rtSE3_2 = iterRtSE3 * rtSE3_2;
 		rtSE3_3 = iterRtSE3 * rtSE3_3;
 		rtSE3_4 = iterRtSE3 * rtSE3_4;
+		rtSE3 = rtSE3 * iterRtSE3;
 	}
     //chain iterRtSE3 to rtSE3
     
@@ -1337,11 +1338,6 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		transformedClouddepth2.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.rightCols<3>().transpose()).transpose();
     }
 
-	//TargetCloud LastCloud_1 = ((rtSE3_1.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
-	//TargetCloud LastCloud_2 = ((rtSE3_2.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
-	//TargetCloud LastCloud_3 = ((rtSE3_3.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
-	//TargetCloud LastCloud_4 = ((rtSE3_4.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
-	//TargetCloud LastCloudOri = ((rtSE3.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
 	TargetCloud LastCloud_1 = ComputeCurrentCloud(last_depth);
 	TargetCloud LastCloud_2 = ComputeCurrentCloud(last_depth);
 	TargetCloud LastCloud_3 = ComputeCurrentCloud(last_depth);
@@ -1362,262 +1358,32 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
    
     Eigen::Vector<Scalar, 6> rt6D;
 
-    if(iteration_loop2<=iteration_divide)
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedClouddepth_before20, tgtCloud)) {
-			std::cout<<"jump1"<<std::endl;
-			meanweight1 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedClouddepth_before20, tgtCloud)){
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			rt6D1 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
-			//rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all));
-		}
-		else
-		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-		}
-		}
-	}
-	else
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedClouddepth, tgtCloud)) {
-			std::cout<<"jump1"<<std::endl;
-			meanweight1 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedClouddepth, tgtCloud)){
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			//rt6D1 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth(corrs.col(0), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
-			rt6D1 =  MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
-			//rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
-		}
-		else
-		{
-			rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
-		}
-		}
-		//std::cout<<"cloudnumber"<<std::endl;
-		//std::cout<<mSrcCloud3.rows()<<std::endl;
-
-		meanweight1 = 1;
-	}
-	//std::cout<<"corrs1num"<<std::endl;
-	//std::cout<<corrs.rows()<<std::endl;
-	
-   
-	if(iteration_loop2<=iteration_divide)
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)) {
-			//std::cout<<"jump2"<<std::endl;
-			meanweight2 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)){
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			rt6D2 =  MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_2, LastCloud_2);
-		
-			//rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
-		}
-		else
-		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-		}
-		}
-	}
-	else
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)) {
-			//std::cout<<"jump2"<<std::endl;
-			meanweight2 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)){
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			rt6D2 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_2, LastCloud_2);
-			//rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
-		}
-		else
-		{
-			rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
-		}
-		}	
-
-		meanweight2 = 1;
-	}
-	//std::cout<<"corrs2num"<<std::endl;
-	//std::cout<<corrs.rows()<<std::endl;
-	//3rd set of correspondences
-
     
-	if(iteration_loop2<=iteration_divide)
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-			//std::cout<<"jump3"<<std::endl;
-			meanweight3 =0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
-		//std::cout<<"cnttrans3"<<std::endl;
-		//std::cout<<cnttrans3<<std::endl;
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			//rt6D3 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb_before20(corrs.col(0), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_3, LastCloud_3);
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
-		}	
-		else
-		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-		}
-		meanweight3 = 1;
-		}
-	
-	}
-	else
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
-			//std::cout<<"jump3"<<std::endl;
-			meanweight3 =0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
-
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			rt6D3 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_3, LastCloud_3);
-			//rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
-		}	
-		else 
-		{
-			rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
-		}
-		meanweight3 = 1;
-		}
-	}
-	//std::cout<<"corrs3num"<<std::endl;
-	//std::cout<<corrs.rows()<<std::endl;
-	//4th set of correspondences
-	
-	
-	if(iteration_loop2<=iteration_divide)
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
-			//std::cout<<"jump4"<<std::endl;
-			meanweight4 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{	
-			rt6D4 =  MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
-			//rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
-			//rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all));
-		}
-		else
-		{
-			rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-		}
-
-		meanweight4 = 1;
-		}
-	}
-	else
-	{
-		//match correspondence
-		if (!MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
-			//std::cout<<"jump4"<<std::endl;
-			meanweight4 = 0;
-		//break; // when correspondence size less than 6
-		}
-		if (MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
-		//get iteration transformation by minimizing p2pl error metric
-		if(Useedgeaware==0)
-		{
-			//rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-			//rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
-			rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
-		}
-		else
-		{
-			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
-		}
-		//std::cout<<"cnttrans4"<<std::endl;
-		//std::cout<<cnttrans4<<std::endl;
-		meanweight4 = 1;
-		}
-	}	
-	//std::cout<<"corrs4num"<<std::endl;
-	//std::cout<<corrs.rows()<<std::endl;
-	// ++ meta task loop end
-	// ++ pose fusion = mean(all tasks' rt6D)
 	SourceCloud transformedCloudOri(srcCloud.rows(), 6) ;
     transformedCloudOri.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
     transformedCloudOri.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+	if (!MatchingByProject2DAndWalk(transformedCloudOri, tgtCloud)) {
+		break; // when correspondence size less than 6
+		}
+	//rt6D = rt6D1;
+	//rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+	rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
+    Transform iterRtSE3;
+	Eigen::Vector3f Pre_trans(rt6D(0),rt6D(1),rt6D(2));
 
-    //match correspondence
-    if (!MatchingByProject2DAndWalk(transformedCloudOri, tgtCloud)) {
-      break; // when correspondence size less than 6
-    }
-    
+    iterRtSE3 = ConstructSE3_GN(rt6D);
 
-	if((meanweight1+meanweight2+meanweight3+meanweight4)==0)
-	{
-		break;
+    //chain iterRtSE3 to rtSE3
+    //rtSE3 = iterRtSE3 * rtSE3;
+	std::cout<<iterRtSE3.col(3).head<3>().transpose()<<"\n";
+	std::cout<<"\npre: "<<Pre_trans;
+	std::cout<<"\nnorm: "<<Pre_trans.norm();
+	if(Pre_trans.norm() > 0.3){
+		rtSE3 = rtSE3;
 	}
 	else{
-
-    rt6D(0) = (rt6D1(0)*meanweight1+ rt6D2(0)*meanweight2 +rt6D3(0)*meanweight3 +rt6D4(0)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
-	rt6D(1) = (rt6D1(1)*meanweight1+ rt6D2(1)*meanweight2 +rt6D3(1)*meanweight3 +rt6D4(1)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
-    rt6D(2) = (rt6D1(2)*meanweight1+ rt6D2(2)*meanweight2 +rt6D3(2)*meanweight3 +rt6D4(2)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
-	rt6D(3) = (rt6D1(3)*meanweight1+ rt6D2(3)*meanweight2 +rt6D3(3)*meanweight3 +rt6D4(3)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
-	rt6D(4) = (rt6D1(4)*meanweight1+ rt6D2(4)*meanweight2 +rt6D3(4)*meanweight3 +rt6D4(4)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
-	rt6D(5) = (rt6D1(5)*meanweight1+ rt6D2(5)*meanweight2 +rt6D3(5)*meanweight3 +rt6D4(5)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+		rtSE3 = rtSE3 * iterRtSE3;
 	}
-	//rt6D = rt6D1;
-	rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-	//rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
-	Transform iterRtSE3_1;
-    iterRtSE3_1 = ConstructSE3_GN(rt6D1);
-    //chain iterRtSE3 to rtSE3
-    rtSE3_1 = iterRtSE3_1 * rtSE3_1;
-	Transform iterRtSE3_2;
-    iterRtSE3_2 = ConstructSE3_GN(rt6D2);
-    //chain iterRtSE3 to rtSE3
-    rtSE3_2 = iterRtSE3_2 * rtSE3_2;
-	Transform iterRtSE3_3;
-    iterRtSE3_3 = ConstructSE3_GN(rt6D3);
-    //chain iterRtSE3 to rtSE3
-    rtSE3_3 = iterRtSE3_3 * rtSE3_3;
-	Transform iterRtSE3_4;
-    iterRtSE3_4 = ConstructSE3_GN(rt6D4);
-    //chain iterRtSE3 to rtSE3
-    rtSE3_4 = iterRtSE3_4 * rtSE3_4;
-    //convert 6D vector to SE3
-    Transform iterRtSE3;
-    iterRtSE3 = ConstructSE3(rt6D);
-
-    //chain iterRtSE3 to rtSE3
-    rtSE3 = iterRtSE3 * rtSE3;
-
     //check termination
     /*if (CheckConverged(rt6D) || iterations > max_iters) {
       break;
@@ -1629,14 +1395,6 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	}
   }
   
-  //icp loop 2 END
-  //justify valid by sliding extent
-  //cancel it if meta perform
-  /*if (accSlidingExtent < thresAccSlidingExtent) {
-    valid = true;
-  } else {
-    valid = false;
-  }*/
   valid = true;
   return rtSE3;
 }
@@ -2546,10 +2304,9 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 		Temp_b(3,0) = d * g;
 		Temp_b(4,0) = e * g;
 		Temp_b(5,0) = f * g;
-		float w = weights.row(i)(0);
-		w = 1;
-		A_icp += Temp * w * w;
-		b_icp += Temp_b * w;
+
+		A_icp += Temp;
+		b_icp += Temp_b;
   	}
 	cv::Mat dIdx;
 	cv::Mat dIdy;
@@ -2566,12 +2323,19 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 	Eigen::Vector<EAS_ICP::Scalar, 6> retAll;
 	A_term A_all;
 	b_term b_all;
-	int wt = 1;
+	int wt = 10;
 
 	A_rgb = A_rgb;
 	b_rgb = b_rgb;
-	float iterations_final = iterations/20;
-	iterations_final = 0;
+	float iterations_final = iterations/100;
+	if(iterations < 20){
+		iterations_final = 0;
+		wt = 1;
+	}
+	else{
+		iterations_final = 0.00025;
+		wt = 150;
+	}
 	A_all = A_rgb * iterations_final * iterations_final + A_icp*wt*wt;
 	b_all = b_rgb * iterations_final + b_icp*wt;
 	//ret = A_icp.ldlt().solve(b_icp);
@@ -2650,15 +2414,15 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	cv::Mat hsv_last;
 	cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
 	cv::cvtColor(rgb_last, inten_last, cv::COLOR_BGR2GRAY);
-
 	cv::cvtColor(rgb, hsv, cv::COLOR_BGR2HSV);
 	cv::cvtColor(rgb_last, hsv_last, cv::COLOR_BGR2HSV);
-	K(0, 0) = fx;
-	K(1, 1) = fy;
-	K(0, 2) = cx;
-	K(1, 2) = cy;
+	K(0, 0) = fx;//fx
+	K(1, 1) = fy;//fy
+	K(0, 2) = cx;//cx
+	K(1, 2) = cy;//cy
 	K(2, 2) = 1;
-	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
+	//Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
+	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt;
 
 	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R = Rt.topLeftCorner(3, 3);
 
@@ -2673,37 +2437,49 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	for (int y = 0; y < 480; ++y){
 		for (int x = 0; x<640; ++x){
 			//float d1 = tgtCloud.row(640*y + x)(2) * 5000;
-			float d1 = (float)depth.at<short>(y, x);
+			float d1 = (float)next_depth.at<short>(y, x);
 
-			float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-			int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1 + 1;
-			int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
-			//std::cout<<"\nd1:  "<<d1;
-			//std::cout<<"\nd2:  "<<d2;
-			
-			
-			//std::cout<<"\nd2_trans:  "<<transformed_d2;
-			//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
-			float d0 = (float)last_depth.at<short>(v0, u0);
-			
-			if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<40){
-
-				//std::cout<<"\nd0:  "<<d0;
-				//std::cout<<"\nd1_trans:  "<<transformed_d1;
-				//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
-				//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
+			if(!isnan(d1) && d1 > 0){
+				float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
+				int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
+				int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
 				//std::cout<<"\nd1:  "<<d1;
-				//std::cout<<"\nd0:  "<<d0;
+				//std::cout<<"\nd2:  "<<d2;
 				
-				int t = (int)inten.at<char>(y, x);
-				int s = (int)inten_last.at<char>(v0, u0);
+				
+				//std::cout<<"\nd2_trans:  "<<transformed_d2;
+				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
+				float d0 = (float)last_depth.at<short>(v0, u0);
 
-				int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
-				int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
+				float valX = dIdx.at<float>(y, x);
+				float valY = dIdy.at<float>(y, x);
+				float mTwo = valX * valX + valY * valY;
 
-				int diff = t-s;
-				total += (diff*diff);
-				count++;
+				//if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<40 && mTwo>1600){
+				if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
+
+					float d0 = (float)last_depth.at<short>(v0, u0);
+
+					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (inten.at<uchar>(y, x) > 0)){
+						//std::cout<<"\nd0:  "<<d0;
+						//std::cout<<"\nd1_trans:  "<<transformed_d1;
+						//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
+						//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
+						//std::cout<<"\nd1:  "<<d1;
+						//std::cout<<"\nd0:  "<<d0;
+						
+						int t = (int)inten.at<char>(y, x);
+						int s = (int)inten_last.at<char>(v0, u0);
+
+						int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
+						int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
+
+						int diff = t-s;
+						//int diff = alfa - beta;
+						total += (diff*diff);
+						count++;
+					}
+				}
 			}
 		}
 	}
@@ -2716,111 +2492,121 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	for (int y = 0; y < 480; ++y){
 		for (int x = 0; x<640; ++x){
 			//float d1 = tgtCloud.row(640*y + x)(2) * 5000;
-			float d1 = (float)depth.at<short>(y, x);
 
-			float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-			int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1 + 1;
-			int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
-			//std::cout<<"\nd1:  "<<d1;
-			//std::cout<<"\nd2:  "<<d2;
-			
-			
-			//std::cout<<"\nd2_trans:  "<<transformed_d2;
-			//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
-			float d0 = (float)last_depth.at<short>(v0, u0);
-			
-			if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<40){
+			//condition check
 
-				//std::cout<<"\nd0:  "<<d0;
-				//std::cout<<"\nd1_trans:  "<<transformed_d1;
-				//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
-				//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
+
+			float d1 = (float)next_depth.at<short>(y, x);
+			if(!isnan(d1) && d1 > 0){
+				float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
+				int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
+				int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
 				//std::cout<<"\nd1:  "<<d1;
-				//std::cout<<"\nd0:  "<<d0;
+				//std::cout<<"\nd2:  "<<d2;
 				
-				int t = (int)inten.at<char>(y, x);
-				int s = (int)inten_last.at<char>(v0, u0);
+				float valX = dIdx.at<float>(y, x);
+				float valY = dIdy.at<float>(y, x);
+				float mTwo = valX * valX + valY * valY;
+				//std::cout<<"\nd2_trans:  "<<transformed_d2;
+				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
+				//float d0 = (float)last_depth.at<short>(v0, u0);
+				
+				//if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<70 && mTwo > 1600){
+				if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
+					float d0 = (float)last_depth.at<short>(v0, u0);
+					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
+						//std::cout<<"\nd0:  "<<d0;
+						//std::cout<<"\nd1_trans:  "<<transformed_d1;
+						//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
+						//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
+						//std::cout<<"\nd1:  "<<d1;
+						//std::cout<<"\nd0:  "<<d0;
+						
+						int t = (int)inten.at<char>(y, x);
+						int s = (int)inten_last.at<char>(v0, u0);
 
-				int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
-				int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
+						int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
+						int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
 
-				int diff = t-s;
-				int diffhsv = alfa-beta;
-				//std::cout<<"\nintens: "<<diff<<"   hsv: "<<diffhsv;
-				float w =  std::abs(diff) + delta;
-				w = w > FLT_EPSILON ? 1.0 / w : 1.0;
-				//std::cout<<"\ndiff:  "<<diff;
-				float cloud_x = LastCloud.row(640*v0 + u0)(0);
-				float cloud_y = LastCloud.row(640*v0 + u0)(1);
-				float cloud_z = LastCloud.row(640*v0 + u0)(2);
-				//std::cout<<"\nd0:  "<<d0;
-				//std::cout<<"\nz:  "<<cloud_z;
-				float invz = 1/cloud_z;
-				float dI_dx_val = w * dIdx.at<float>(y, x)/8;
-				float dI_dy_val = w * dIdy.at<float>(y, x)/8;
-				float v0 = dI_dx_val * fx * invz;
-				float v1 = dI_dy_val * fy * invz;
-				float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
-				//sstd::cout<<"\ndI_dx_val:  "<<dI_dx_val;
-				double a,b,c,d,e,f,g;
+						int diff = t-s;
+						//int diff = alfa-beta;
+						//std::cout<<"\nintens: "<<diff<<"   hsv: "<<diffhsv;
+						float w =  std::abs(diff) + delta;
+						w = w > FLT_EPSILON ? 1.0 / w : 1.0;
+						//std::cout<<"\ndiff:  "<<diff;
+						float cloud_x = LastCloud.row(640*v0 + u0)(0);
+						float cloud_y = LastCloud.row(640*v0 + u0)(1);
+						float cloud_z = LastCloud.row(640*v0 + u0)(2);
+						//std::cout<<"\nd0:  "<<d0;
+						//std::cout<<"\nz:  "<<cloud_z;
+						float invz = 1/cloud_z;
+						float dI_dx_val = w * dIdx.at<float>(y, x)/8;
+						float dI_dy_val = w * dIdy.at<float>(y, x)/8;
+						float v0 = dI_dx_val * fx * invz;
+						float v1 = dI_dy_val * fy * invz;
+						float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
+						//sstd::cout<<"\ndI_dx_val:  "<<dI_dx_val;
+						double a,b,c,d,e,f,g;
 
-				a = v0;
-				b = v1;
-				c = v2;
-				d = -cloud_z * v1 + cloud_y * v2;
-				e = cloud_z * v0 - cloud_x * v2;
-				f = -cloud_y * v0 + cloud_x * v1;
-				g = -w * diff;
-				//std::cout<<"\npoint: ("<<cloud_x<<", "<<cloud_y<<", "<<cloud_z<<")";
-				//std::cout<<"\na :"<<a;
-				//std::cout<<"\nb :"<<b;
-				//std::cout<<"\nc :"<<c;
-				//std::cout<<"\nd :"<<d;
-				//std::cout<<"\ne :"<<e;
-				//std::cout<<"\nf :"<<f;
-				//std::cout<<"\ng :"<<g;
-				Temp(0,0) = a * a;
-				Temp(0,1) = Temp(1,0) = a * b;
-				Temp(0,2) = Temp(2,0) = a * c;
-				Temp(0,3) = Temp(3,0) = a * d;
-				Temp(0,4) = Temp(4,0) = a * e;
-				Temp(0,5) = Temp(5,0) = a * f;
+						a = v0;
+						b = v1;
+						c = v2;
+						d = -cloud_z * v1 + cloud_y * v2;
+						e = cloud_z * v0 - cloud_x * v2;
+						f = -cloud_y * v0 + cloud_x * v1;
+						g = -w * diff;
+						//std::cout<<"\npoint: ("<<cloud_x<<", "<<cloud_y<<", "<<cloud_z<<")";
+						//std::cout<<"\na :"<<a;
+						//std::cout<<"\nb :"<<b;
+						//std::cout<<"\nc :"<<c;
+						//std::cout<<"\nd :"<<d;
+						//std::cout<<"\ne :"<<e;
+						//std::cout<<"\nf :"<<f;
+						//std::cout<<"\ng :"<<g;
+						Temp(0,0) = a * a;
+						Temp(0,1) = Temp(1,0) = a * b;
+						Temp(0,2) = Temp(2,0) = a * c;
+						Temp(0,3) = Temp(3,0) = a * d;
+						Temp(0,4) = Temp(4,0) = a * e;
+						Temp(0,5) = Temp(5,0) = a * f;
 
-				Temp(1,1) = b * b;
-				Temp(1,2) = Temp(2,1) = b * c;
-				Temp(1,3) = Temp(3,1) = b * d;
-				Temp(1,4) = Temp(4,1) = b * e;
-				Temp(1,5) = Temp(5,1) = b * f;
+						Temp(1,1) = b * b;
+						Temp(1,2) = Temp(2,1) = b * c;
+						Temp(1,3) = Temp(3,1) = b * d;
+						Temp(1,4) = Temp(4,1) = b * e;
+						Temp(1,5) = Temp(5,1) = b * f;
 
-				Temp(2,2) = c * c;
-				Temp(2,3) = Temp(3,2) = c * d;
-				Temp(2,4) = Temp(4,2) = c * e;
-				Temp(2,5) = Temp(5,2) = c * f;
+						Temp(2,2) = c * c;
+						Temp(2,3) = Temp(3,2) = c * d;
+						Temp(2,4) = Temp(4,2) = c * e;
+						Temp(2,5) = Temp(5,2) = c * f;
 
-				Temp(3,3) = d * d;
-				Temp(3,4) = Temp(4,3) = d * e;
-				Temp(3,5) = Temp(5,3) = d * f;
+						Temp(3,3) = d * d;
+						Temp(3,4) = Temp(4,3) = d * e;
+						Temp(3,5) = Temp(5,3) = d * f;
 
-				Temp(4,4) = e * e;
-				Temp(4,5) = Temp(5,4) = e * f;
+						Temp(4,4) = e * e;
+						Temp(4,5) = Temp(5,4) = e * f;
 
-				Temp(5,5) = f * f;
+						Temp(5,5) = f * f;
 
-				Temp_b(0,0) = a * g;
-				Temp_b(1,0) = b * g;
-				Temp_b(2,0) = c * g;
-				Temp_b(3,0) = d * g;
-				Temp_b(4,0) = e * g;
-				Temp_b(5,0) = f * g;
+						Temp_b(0,0) = a * g;
+						Temp_b(1,0) = b * g;
+						Temp_b(2,0) = c * g;
+						Temp_b(3,0) = d * g;
+						Temp_b(4,0) = e * g;
+						Temp_b(5,0) = f * g;
 
-				A_rgb += Temp;
-				b_rgb += Temp_b;
+						A_rgb += Temp;
+						b_rgb += Temp_b;
 
-				count++;
-				total += (diff * diff);
-				//std::cout<<"\ndI_dx_val: "<<dI_dx_val;
-				//std::cout<<"\ndI_dx: "<<(int)dIdx.at<char>(y, x);
-				//std::cout<<"\ncoord:  "<<"("<<u0<<","<<v0<<")";
+						count++;
+						total += (diff * diff);
+						//std::cout<<"\ndI_dx_val: "<<dI_dx_val;
+						//std::cout<<"\ndI_dx: "<<(int)dIdx.at<char>(y, x);
+						//std::cout<<"\ncoord:  "<<"("<<u0<<","<<v0<<")";
+					}
+				}
 			}
 		}
 	}
@@ -2830,7 +2616,7 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	//std::cout<<"\nb_rgb: "<<b_rgb<<"\n";
 	//std::cout<<"\nret: "<<ret<<"\n";
 	float average = sqrt((float)total/(float)count);
-	std::cout<<"\ncount: "<<(float)count/(640*480)<<"\n";
+	std::cout<<"\ncount: "<<count<<"\n";
 	std::cout<<"\ntotal loss: "<<total<<"\n";
 	std::cout<<"\naverage: "<<average<<"\n";
 }
@@ -2847,13 +2633,14 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 
 	cv::cvtColor(rgb, hsv, cv::COLOR_BGR2HSV);
 	cv::cvtColor(rgb_last, hsv_last, cv::COLOR_BGR2HSV);
-	K(0, 0) = fx;
-	K(1, 1) = fy;
-	K(0, 2) = cx;
-	K(1, 2) = cy;
+	K(0, 0) = 528;//fx;
+	K(1, 1) = 528;//fy;
+	K(0, 2) = 320;//cx;
+	K(1, 2) = 240;//cy;
 	K(2, 2) = 1;
 
-	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
+	//Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
+	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt;
 
 	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R = Rt.topLeftCorner(3, 3);
 
@@ -2863,8 +2650,8 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 	//std::cout<<inten;
 	Kt = K * Kt;
 	float total = 0;
-	A_term Temp;
-	b_term Temp_b;
+	A_term Temp = A_term::Zero();
+	b_term Temp_b = b_term::Zero();
 	int count = 0;
 	//std::cout<<"corrs:"<<corrs;
 	//int coord = corrs.row(0)(1);
@@ -2878,36 +2665,38 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 		float d1 = (float)depth.at<short>(y, x);
 
 		float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-		int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1 + 1;
+		int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
 		int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
 		//std::cout<<"\nd1:  "<<d1;
 		//std::cout<<"\nd2:  "<<d2;
 		
 		
 		//std::cout<<"\nd2_trans:  "<<transformed_d2;
-		float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
-		//float d0 = (float)last_depth.at<short>(v0, u0);
-		if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<70){
+		//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
+		if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
+			float d0 = (float)last_depth.at<short>(v0, u0);
+			if(d0>0 && std::abs(transformed_d1-d0)<70 && inten_last.at<uchar>(v0, u0) != 0){
 
-			//std::cout<<"\nd0:  "<<d0;
-			//std::cout<<"\nd1_trans:  "<<transformed_d1;
-			//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
-			//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
-			//std::cout<<"\nd1:  "<<d1;
-			//std::cout<<"\nd0:  "<<d0;
-			
-			int t = (int)inten.at<uchar>(y, x);
-			int s = (int)inten_last.at<uchar>(v0, u0);
-			//std::cout<<"\n\nt:  "<<t;
-			//std::cout<<"\nt2:  "<<t2<<"\n";
-			int diff = t-s;
-			//std::cout<<"\ndiff: "<<diff;
-			total += (diff*diff);
-			count++;
+				//std::cout<<"\nd0:  "<<d0;
+				//std::cout<<"\nd1_trans:  "<<transformed_d1;
+				//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
+				//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
+				//std::cout<<"\nd1:  "<<d1;
+				//std::cout<<"\nd0:  "<<d0;
+				
+				int t = (int)inten.at<uchar>(y, x);
+				int s = (int)inten_last.at<uchar>(v0, u0);
+				//std::cout<<"\n\nt:  "<<t;
+				//std::cout<<"\nt2:  "<<t2<<"\n";
+				float diff = (float)t-(float)s;
+				//std::cout<<"\ndiff: "<<diff;
+				total += (diff*diff);
+				count++;
 
+			}
 		}
 	}
-	float delta = sqrt((float)total/(float)count);;
+	float delta = sqrt((float)total/(float)count);
 	std::cout<<"\ncount: "<<count;
 	std::cout<<"\ntotal: "<<total;
 	std::cout<<"\ndelta: "<<delta;
@@ -2919,22 +2708,26 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 		int x = coord%640;
 		int y = coord/640;
 
-		float d1 = (float)depth.at<short>(y, x);
+		float d1 = (float)next_depth.at<short>(y, x);
 
 		float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-		int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1 + 1;
+		int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
 		int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
 		//std::cout<<"\nd1:  "<<d1;
 		//std::cout<<"\nd2:  "<<d2;
-		
-		
-		//std::cout<<"\nd2_trans:  "<<transformed_d2;
-		float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
-		//float d0 = (float)last_depth.at<short>(v0, u0);
-		
-		
-		if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<70){
 
+		float valX = dIdx.at<float>(y, x);
+		float valY = dIdy.at<float>(y, x);
+		float mTwo = valX * valX + valY * valY;
+		//std::cout<<"\nmTwo:  "<<mTwo;
+		//std::cout<<"\nd2_trans:  "<<transformed_d2;
+		//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
+	if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480 && mTwo >1600){
+
+		float d0 = (float)last_depth.at<short>(v0, u0);
+		if(d0>0 && std::abs(transformed_d1-d0)<70 && inten_last.at<uchar>(v0, u0) != 0){
+			
+			std::cout<<"\nmTwo:  "<<mTwo;
 			//std::cout<<"\nd0:  "<<d0;
 			//std::cout<<"\nd1_trans:  "<<transformed_d1;
 			//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
@@ -2948,7 +2741,7 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 			int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
 			int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
 
-			int diff = t-s;
+			float diff = (float)t-(float)s;
 			int diffhsv = alfa-beta;
 			//std::cout<<"\nintens: "<<diff<<"   hsv: "<<diffhsv;
 			float w =  std::abs(diff) + delta;
@@ -2963,7 +2756,9 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 			float v0 = dI_dx_val * fx * invz;
 			float v1 = dI_dy_val * fy * invz;
 			float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
-			//std::cout<<"\ndI_dx:  "<<(int)dIdy.at<short>(y, x);
+			//std::cout<<"\ndI_dx_val:  "<<dI_dx_val;
+			std::cout<<"\ncloud z :"<<cloud_z;
+			std::cout<<"\nd0 :"<<d0;
 			double a,b,c,d,e,f,g;
 
 			a = v0;
@@ -3023,6 +2818,7 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 			//std::cout<<"\ndI_dx_val: "<<dI_dx_val;
 			//std::cout<<"\ndI_dx: "<<(int)dIdx.at<char>(y, x);
 			//std::cout<<"\ncoord:  "<<"("<<u0<<","<<v0<<")";
+			}
 		}
 	}
 	//Eigen::Vector<EAS_ICP::Scalar, 6> ret;
@@ -3031,7 +2827,7 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 	//std::cout<<"\nb_rgb: "<<b_rgb<<"\n";
 	//std::cout<<"\nret: "<<ret<<"\n";
 	float average = sqrt((float)total/(float)count);
-	std::cout<<"\ncount: "<<(float)count/(640*480)<<"\n";
+	std::cout<<"\ncount: "<<count<<"\n";
 	std::cout<<"\ntotal loss: "<<total<<"\n";
 	std::cout<<"\naverage: "<<average<<"\n";
 }
@@ -3076,10 +2872,10 @@ void EAS_ICP::computeDerivativeImagesHSV(const cv::Mat& rgb, cv::Mat& dIdx, cv::
 
   cv::Mat kernelX(3, 3, CV_32F, gsx3x3);
   cv::Mat kernelY(3, 3, CV_32F, gsy3x3);
-  //cv::filter2D( Hue, dIdx, -1 , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
-  //cv::filter2D( Hue, dIdy, -1 , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
-  cv:: Sobel(Hue, dIdx, CV_32F, 1, 0, 1);
-  cv:: Sobel(Hue, dIdy, CV_32F, 0, 1, 1);
+  cv::filter2D( Hue, dIdx, CV_32F , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  cv::filter2D( Hue, dIdy, CV_32F , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  //cv:: Sobel(Hue, dIdx, CV_32F, 1, 0, 1);
+  //cv:: Sobel(Hue, dIdy, CV_32F, 0, 1, 1);
 
 }
 const EAS_ICP::Transform& EAS_ICP::Register_Ori(const SourceCloud& srcCloud, const cv::Mat& depth, const cv::Mat& rgb, const TargetCloud& tgtCloud, const Transform& initialGuess) {

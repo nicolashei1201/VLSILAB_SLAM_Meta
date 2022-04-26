@@ -84,6 +84,7 @@ public:
   cv::Mat last_rgb;
   cv::Mat last_depth;
   cv::Mat last_inten;
+  cv::Mat next_depth;
 
   std::unique_ptr<CurrentCloud> pLastCloud;
 private:

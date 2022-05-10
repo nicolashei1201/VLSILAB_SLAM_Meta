@@ -53,7 +53,7 @@
 #include "convenience.cuh"
 #include "operators.cuh"
 
-#if __CUDA_ARCH__ < 300
+//#if __CUDA_ARCH__ < 300
 __inline__ __device__
 float __shfl_down(float val, int offset, int width = 32)
 {
@@ -77,7 +77,7 @@ int __shfl_down(int val, int offset, int width = 32)
     __syncthreads();
     return val;
 }
-#endif
+//#endif
 
 #if __CUDA_ARCH__ < 350
 template<typename T>

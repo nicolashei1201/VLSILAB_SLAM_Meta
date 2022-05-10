@@ -29,6 +29,10 @@ SET(OpenCV_DIR /home/jyli/packages/installation/OpenCV-4.1.1/lib/cmake/opencv4)
 find_package( OpenCV 4 REQUIRED )
 SET(G2O_ROOT /home/jyli/projects/ICPORB_VO/Thirdparty/g2o)
 find_package( G2O REQUIRED )
+# add fusion lib
+find_package(efusion REQUIRED)
+find_package(CUDA REQUIRED)
+
 INCLUDE_DIRECTORIES(
   ${PROJECT_SOURCE_DIR}
   ${PROJECT_SOURCE_DIR}/include
@@ -40,6 +44,9 @@ INCLUDE_DIRECTORIES(
   ${Pangolin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIR}
 )
+# add fusion lib
+include_directories(${EFUSION_INCLUDE_DIR})
+include_directories(${CUDA_INCLUDE_DIRS})
 
 # build ORB SLAM2
 add_library(ORB_SLAM2 SHARED
@@ -104,6 +111,8 @@ add_library(ICPORB_VO SHARED
 )
 target_link_libraries( ICPORB_VO 
   ORB_SLAM2
+  ${EFUSION_LIBRARY}
+  ${CUDA_LIBRARIES}
 )
 
 # Build executable files

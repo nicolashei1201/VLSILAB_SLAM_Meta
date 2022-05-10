@@ -133,12 +133,16 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 
   //initial parameters
   std::cout<<"Meta ICP\n";
-  
-  rtSE3 = initialGuess;
-  rtSE3_1 = initialGuess;
-  rtSE3_2 = initialGuess;
-  rtSE3_3 = initialGuess;
-  rtSE3_4 = initialGuess;
+  Transform initialGuess_I = Transform::Identity();
+  Transform SO3Pose = SO3_prealign(initialGuess,rgb, 4);
+  SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
+  //SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
+
+  rtSE3 = SO3Pose;
+  rtSE3_1 = SO3Pose;
+  rtSE3_2 = SO3Pose;
+  rtSE3_3 = SO3Pose;
+  rtSE3_4 = SO3Pose;
   
  /*
   rtSE3 = Transform::Identity();
@@ -828,10 +832,16 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
     //convert 6D vector to SE3
     Eigen::Vector<Scalar, 6> rt6D_L1_largest;
 	double s1, s2, s3, s4;
+	/*
 	s1 = fabs(rt6D1(0))+fabs(rt6D1(1))+fabs(rt6D1(2));
 	s2 = fabs(rt6D2(0))+fabs(rt6D2(1))+fabs(rt6D2(2));
 	s3 = fabs(rt6D3(0))+fabs(rt6D3(1))+fabs(rt6D3(2));
 	s4 = fabs(rt6D4(0))+fabs(rt6D4(1))+fabs(rt6D4(2));
+	*/
+	s1 = fabs(rt6D1(3))+fabs(rt6D1(4))+fabs(rt6D1(5));
+	s2 = fabs(rt6D2(4))+fabs(rt6D2(4))+fabs(rt6D2(5));
+	s3 = fabs(rt6D3(4))+fabs(rt6D3(4))+fabs(rt6D3(5));
+	s4 = fabs(rt6D4(4))+fabs(rt6D4(4))+fabs(rt6D4(5));
 	if((s1>=s2)&&(s1>=s3)&&(s1>=s4))
 	{
 		std::cout<<"\n\nHAHSAHAH\n\n";
@@ -856,7 +866,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	
 	Transform iterRtSE3;
 	Transform Pre_RtSE3;
-	Eigen::Vector3f Pre_trans(rt6D_L1_largest(0),rt6D_L1_largest(1),rt6D_L1_largest(2));
+	//Eigen::Vector3f Pre_trans(rt6D_L1_largest(0),rt6D_L1_largest(1),rt6D_L1_largest(2));
+	Eigen::Vector3f Pre_trans(rt6D_L1_largest(3),rt6D_L1_largest(4),rt6D_L1_largest(5));
     iterRtSE3 = ConstructSE3_GN(rt6D_L1_largest);
 	//iterRtSE3 = ConstructSE3(rt6D_L1_largest);
     //chain iterRtSE3 to rtSE3
@@ -1366,12 +1377,12 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		break; // when correspondence size less than 6
 		}
 	//rt6D = rt6D1;
-	//rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-	rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
+	rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+	//rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
     Transform iterRtSE3;
 	Eigen::Vector3f Pre_trans(rt6D(0),rt6D(1),rt6D(2));
 
-    iterRtSE3 = ConstructSE3_GN(rt6D);
+    iterRtSE3 = ConstructSE3(rt6D);
 
     //chain iterRtSE3 to rtSE3
     //rtSE3 = iterRtSE3 * rtSE3;
@@ -2351,8 +2362,8 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 	std::cout<<"result:\n"<<ret<<"\n";
 	std::cout<<"\n-------------------------\n";
 	*/
-	std::cout<<"b_icp:\n"<<b_icp * wt<<"\n";
-	std::cout<<"b_rgb:\n"<<b_rgb * iterations_final<<"\n";
+	//std::cout<<"b_icp:\n"<<b_icp * wt<<"\n";
+	//std::cout<<"b_rgb:\n"<<b_rgb * iterations_final<<"\n";
 	//std::cout<<"resultICP:\n"<<ret<<"\n";
 	//std::cout<<"resultRGB:\n"<<retRGB<<"\n";
 	//std::cout<<"resultAll:\n"<<retAll<<"\n";
@@ -2451,16 +2462,16 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
 				float d0 = (float)last_depth.at<short>(v0, u0);
 
-				float valX = dIdx.at<float>(y, x);
-				float valY = dIdy.at<float>(y, x);
-				float mTwo = valX * valX + valY * valY;
+				short valX = dIdx.at<short>(y, x);
+				short valY = dIdy.at<short>(y, x);
+				short mTwo = valX * valX + valY * valY;
 
 				//if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<40 && mTwo>1600){
 				if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
 
 					float d0 = (float)last_depth.at<short>(v0, u0);
 
-					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (inten.at<uchar>(y, x) > 0)){
+					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
 						//std::cout<<"\nd0:  "<<d0;
 						//std::cout<<"\nd1_trans:  "<<transformed_d1;
 						//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
@@ -2504,9 +2515,9 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 				//std::cout<<"\nd1:  "<<d1;
 				//std::cout<<"\nd2:  "<<d2;
 				
-				float valX = dIdx.at<float>(y, x);
-				float valY = dIdy.at<float>(y, x);
-				float mTwo = valX * valX + valY * valY;
+				short valX = dIdx.at<short>(y, x);
+				short valY = dIdy.at<short>(y, x);
+				short mTwo = valX * valX + valY * valY;
 				//std::cout<<"\nd2_trans:  "<<transformed_d2;
 				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
 				//float d0 = (float)last_depth.at<short>(v0, u0);
@@ -2540,8 +2551,8 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 						//std::cout<<"\nd0:  "<<d0;
 						//std::cout<<"\nz:  "<<cloud_z;
 						float invz = 1/cloud_z;
-						float dI_dx_val = w * dIdx.at<float>(y, x)/8;
-						float dI_dy_val = w * dIdy.at<float>(y, x)/8;
+						float dI_dx_val = w * dIdx.at<short>(y, x)/8;
+						float dI_dy_val = w * dIdy.at<short>(y, x)/8;
 						float v0 = dI_dx_val * fx * invz;
 						float v1 = dI_dy_val * fy * invz;
 						float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
@@ -2845,8 +2856,8 @@ void EAS_ICP::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat
   cv::cvtColor(rgb, intensity, cv::COLOR_BGR2GRAY);
   cv::Mat kernelX(3, 3, CV_32F, gsx3x3);
   cv::Mat kernelY(3, 3, CV_32F, gsy3x3);
-  cv::filter2D( intensity, dIdx, CV_32F , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
-  cv::filter2D( intensity, dIdy, CV_32F , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  cv::filter2D( intensity, dIdx, CV_16S , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  cv::filter2D( intensity, dIdy, CV_16S , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
   //dIdx = dIdx * (-1);
   //dIdy = dIdy * (-1);
   //cv:: Sobel(intensity, dIdx, CV_32F, 1, 0, 1);
@@ -4435,4 +4446,172 @@ const EAS_ICP::Transform& EAS_ICP::Register_Ori(const SourceCloud& srcCloud, con
   valid = true;
 
   return rtSE3;
+}
+EAS_ICP::Transform EAS_ICP::SO3_prealign(EAS_ICP::Transform Pose_in, const cv::Mat rgb, int scale){
+
+	cv::Mat intensity;
+	cv::Mat last_intensity;
+  	cv::cvtColor(rgb, intensity, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(last_rgb, last_intensity, cv::COLOR_BGR2GRAY);
+
+	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> K = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>::Zero();
+	cv::Mat rgb_in;
+	//int scale = 1;
+	cv::resize(rgb, rgb_in, cv::Size(640/scale, 480/scale), cv::INTER_CUBIC);
+
+	int cols = rgb_in.cols;
+	int rows = rgb_in.rows;
+
+	K(0, 0) = fx/scale;//fx
+	K(1, 1) = fy/scale;//fy
+	K(0, 2) = cx/scale;//cx
+	K(1, 2) = cy/scale;//cy
+	K(2, 2) = 1;
+	//Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = Pose_in.inverse();
+	Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = Transform::Identity();
+	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> resultR = Rt.topLeftCorner(3, 3);
+	//Eigen::Matrix<double, 3, 3, Eigen::RowMajor> resultR = Pose_in.topLeftCorner(3, 3).inverse();
+	Eigen::Vector3d resultDelta;
+	//Eigen::Matrix<double, 3, 3, Eigen::RowMajor> last_resultR = Rt.topLeftCorner(3, 3);
+	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> last_resultR = resultR;
+	double last_count, last_error, count, error, SO3error;
+	last_count = 0;
+	SO3error = std::numeric_limits<double>::max() / 2;
+	last_error = std::numeric_limits<double>::max() / 2;
+	for (int iter = 0; iter<10; iter++){
+
+
+		
+		count = 0;
+		error = 0;
+		//std::cout<<"\n"<<resultR;
+		double row[4];
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> jtj;
+		Eigen::Matrix<double, 3, 1> jtr;
+		
+		//Eigen::Matrix<double, 4, 4, Eigen::RowMajor> Rt = resultRt.inverse();
+		
+
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> homography = K * resultR * K.inverse();
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> K_inv = K.inverse();
+		Eigen::Matrix<double, 3, 3, Eigen::RowMajor> K_R_lr = K * resultR;
+
+		double a = K_R_lr(0,0);
+		double b = K_R_lr(0,1);
+		double c = K_R_lr(0,2);
+
+		double d = K_R_lr(1,0);
+		double e = K_R_lr(1,1);
+		double f = K_R_lr(1,2);
+
+		double g = K_R_lr(2,0);
+		double h = K_R_lr(2,1);
+		double i = K_R_lr(2,2);
+
+		for (int y = 1; y < rgb_in.rows-1; y++){
+			for(int x = 1; x < rgb_in.cols-1; x++){
+
+				Eigen::Matrix<double, 3, 3, Eigen::RowMajor> jtj_temp;
+				Eigen::Matrix<double, 3, 1> jtr_temp;
+
+				Eigen::Vector3d unwarpedReferencePoint(x, y, 1.0);
+				Eigen::Vector3d warpedReferencePoint = homography * unwarpedReferencePoint;
+				int warped_x = (int)(warpedReferencePoint(0)/warpedReferencePoint(2));
+				int warped_y = (int)(warpedReferencePoint(1)/warpedReferencePoint(2));
+				if(	warped_x >= 1 && 
+					warped_x < cols - 1 &&
+					warped_y >= 1 &&
+					warped_y < rows){
+
+					double gradNext_x = ((double)intensity.at<uchar>(warped_y, warped_x - 1) - (double)intensity.at<uchar>(warped_y, warped_x + 1))/2;
+					double gradNext_y = ((double)intensity.at<uchar>(warped_y - 1, warped_x) - (double)intensity.at<uchar>(warped_y + 1, warped_x))/2;
+					double gradLast_x = ((double)last_intensity.at<uchar>(y, x - 1) - (double)last_intensity.at<uchar>(y, x + 1))/2;
+					double gradLast_y = ((double)last_intensity.at<uchar>(y - 1, x) - (double)last_intensity.at<uchar>(y + 1, x))/2;
+					
+					double gx = (gradNext_x + gradLast_x)/2;
+					double gy = (gradNext_y + gradLast_y)/2;
+
+					Eigen::Vector3d point = K_inv * warpedReferencePoint;
+
+					double z2 = point(2) * point(2);
+
+					Eigen::Vector3d leftProduct(((point(2) * (d * gy + a * gx)) - (gy * g * y) - (gx * g * x)) / z2,
+												((point(2) * (e * gy + b * gx)) - (gy * h * y) - (gx * h * x)) / z2,
+												((point(2) * (f * gy + c * gx)) - (gy * i * y) - (gx * i * x)) / z2);
+					Eigen::Vector3d jacRow = leftProduct.cross(point);
+
+					row[0] = jacRow(0);
+					row[1] = jacRow(1);
+					row[2] = jacRow(2);
+					row[3] = -((double)intensity.at<uchar>(warped_y, warped_x) - (double)last_intensity.at<uchar>(y, x));
+
+					jtj_temp(0,0) = row[0] * row[0];
+					jtj_temp(0,1) = jtj_temp(1,0) = row[0] * row[1];
+					jtj_temp(0,2) = jtj_temp(2,0) = row[0] * row[2];
+
+					jtj_temp(1,1) = row[1] * row[1];
+					jtj_temp(1,2) = jtj_temp(2,1) = row[1] * row[2];
+
+					jtj_temp(2,2) = row[2] * row[2];
+
+					jtr_temp(0,0) = row[0] * row[3];
+					jtr_temp(1,0) = row[1] * row[3];
+					jtr_temp(2,0) = row[2] * row[3];
+
+					jtj = jtj + jtj_temp;
+					jtr = jtr + jtr_temp;
+
+					count++;
+					error += row[3] * row[3];
+				}
+				
+			}
+		
+		}
+		SO3error = sqrt(error) / count;
+		std::cout<<"\nSO3 error: "<<SO3error<<"\n";
+		std::cout<<"\nlast SO3 error: "<<last_error<<"\n";
+		if(SO3error < last_error && last_count == count)
+        {
+            break;
+        }
+		else if(SO3error > last_error + 0.001) //Diverging
+        {
+			SO3error = last_error;
+			count = last_count;
+			resultR = last_resultR;
+			break;
+        }
+
+		last_error = SO3error;
+		last_count = count;
+		last_resultR = resultR;
+
+		Eigen::Vector3d delta = jtj.ldlt().solve(jtr);
+		resultDelta += delta;
+		double n_norm = delta.norm();
+		std::cout<<"\ndelta: "<<n_norm;
+		Eigen::AngleAxisd rotation_vector (n_norm, delta/n_norm);
+		Eigen::Matrix3d rotm;
+		rotm = rotation_vector.toRotationMatrix();
+		resultR = resultR * rotm;
+		//Rt.topLeftCorner(3, 3) = rotm;
+		//std::cout<<"\n"<<jtr<<"\n";
+
+	}
+	Eigen::Vector3d Trans_in = Pose_in.topRightCorner(3, 1);
+	std::cout<<"\ndelta All: "<<resultDelta.norm();
+	std::cout<<"\nin Trans: "<<Trans_in.norm();
+	Rt.topLeftCorner(3, 3) = resultR.inverse();
+
+	//if(resultDelta.norm()>0.05 || Trans_in.norm() > 0.02){
+	if(resultDelta.norm() > 0.05 || Trans_in.norm() > 0.05){
+		//Rt = Transform::Identity();
+		Rt = Pose_in;
+	}
+	//std::cout<<"\n"<<Rt<<"\n";
+	//Rt = Transform::Identity();
+	//Rt.topRightCorner(3, 1) = Trans_in;
+	return Rt;
+
 }

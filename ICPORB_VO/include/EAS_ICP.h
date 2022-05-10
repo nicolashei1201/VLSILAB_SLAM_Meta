@@ -93,6 +93,7 @@ private:
   double mDepthMapFactor;
   Transform ConstructSE3(const Eigen::Vector<Scalar, 6> rt6D);
   Transform ConstructSE3_GN(const Eigen::Vector<Scalar, 6> rt6D);
+  Transform SO3_prealign(Transform Pose_in, const cv::Mat rgb, int scale);
   bool CheckConverged(const Eigen::Vector<Scalar, 6>& rt6D);
   bool CheckConverged_GN(const Eigen::Vector<Scalar, 6>& rt6D);
   std::unique_ptr<CurrentCloudrgb> keycloud;

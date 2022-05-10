@@ -295,6 +295,14 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         globalModel.initialise(*feedbackBuffers[FeedbackBuffer::RAW], *feedbackBuffers[FeedbackBuffer::FILTERED]);
 
         frameToModel.initFirstRGB(textures[GPUTexture::RGB]);
+        /*
+        if (useICPORB_VO) {
+        cv::Mat cvDepth(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_16UC1, (void*)depth);
+        cv::Mat cvRGB(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_8UC3, (void*)rgb);
+        cvDepth.convertTo(cvDepth, CV_16UC1, 1);
+        icporb_vo->IncrementalTrack(cvRGB, cvDepth,(double)timestamp/1000);
+        }
+        */
     }
     else
     {

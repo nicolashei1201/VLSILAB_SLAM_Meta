@@ -22,6 +22,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fstream>
 EAS_ICP::EAS_ICP( const std::string& strSettings){
   cv::FileStorage FsSettings(strSettings.c_str(), cv::FileStorage::READ);
 
@@ -72,6 +73,95 @@ EAS_ICP::~EAS_ICP(){
 
 }
 
+const EAS_ICP::Transform& EAS_ICP::RegisterPure(const SourceCloud& srcCloud, const cv::Mat& depth, const cv::Mat& rgb, const TargetCloud& tgtCloud, const Transform& initialGuess, const cv::Mat& Last_intens) {
+
+  //initial parameters
+  rtSE3 = initialGuess;
+  rtSE3 = Transform::Identity();
+  iterations = 0;
+  accSlidingExtent = 0;
+  computeDerivativeImages(last_rgb, dIdx, dIdy);
+  
+  Transform initialGuess_I = Transform::Identity();
+  Transform SO3Pose = SO3_prealign(initialGuess,rgb, 4);
+  SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
+  rtSE3 = SO3Pose;
+  
+  //cv::namedWindow("rgb_edge", cv::WINDOW_AUTOSIZE);
+  
+  //cv::Mat rgb_cpy;
+  //cv::cvtColor(rgb, rgb_cpy, cv::COLOR_BGR2RGB);
+  //cv::imshow("rgb_edge", rgb_cpy);
+  //cv::waitKey(30);
+  
+  //cv::Mat final_edges = cv::abs(dIdx | dIdy);
+  //final_edges.setTo(0, cv::abs(final_edges) < 60);
+  //final_edges.setTo(255, cv::abs(final_edges) > 60);
+
+
+  std::cout<<"\nRGB quality: "<<rgb_quality;
+  std::cout<<"\nDepth quality: "<<depth_quality<<"\n";
+
+  while (true) {
+    iterations+=1;
+
+    //transform source cloud by inital guess
+    SourceCloud transformedCloud(srcCloud.rows(), 6) ;
+    transformedCloud.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+    transformedCloud.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+    clock_t t_m1, t_m2;
+	TargetCloud LastCloud = ComputeCurrentCloud(last_depth);
+    t_m1 = clock();
+    //match correspondence
+    if (!MatchingByProject2DAndWalk(transformedCloud, tgtCloud)) {
+      break; // when correspondence size less than 6
+    }
+	/*
+	if(iterations == 1){
+		RANSAC_strategy(transformedCloud,tgtCloud);
+	}
+	*/
+    t_m2 = clock();
+    //std::cout<<"matching corres"<<std::endl;
+    //std::cout<<double(t_m2-t_m1)/CLOCKS_PER_SEC<<std::endl;
+    //get iteration transformation by minimizing p2pl error metric
+    clock_t t_p1, t_p2;
+    t_p1 = clock();
+    Eigen::Vector<Scalar, 6> rt6D;
+	Transform iterRtSE3;
+	if(iterations < 25){
+		//rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloud);
+		//rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		iterRtSE3 = ConstructSE3_GN(rt6D);
+	}
+	else{
+		//rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		//rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		
+		//convert 6D vector to SE3
+		rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloud);
+		iterRtSE3 = ConstructSE3_GN(rt6D);
+	}
+    //chain iterRtSE3 to rtSE3
+    rtSE3 = iterRtSE3 * rtSE3;
+    t_p2 = clock();
+    //std::cout<<"pose esti"<<std::endl;
+    //std::cout<<double(t_p2-t_p1)/CLOCKS_PER_SEC<<std::endl;
+
+    //check termination
+    if (iterations > 50) {
+      break;
+    }
+  }
+  //justify valid by sliding extent
+  if (accSlidingExtent < thresAccSlidingExtent) {
+    valid = true;
+  } else {
+    valid = false;
+  }
+  return rtSE3;
+}
 const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess) {
 
   //initial parameters
@@ -99,12 +189,12 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const T
     t_p1 = clock();
     Eigen::Vector<Scalar, 6> rt6D;
 
-	rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-    //rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+	//rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+    rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
     
     //convert 6D vector to SE3
     Transform iterRtSE3;
-    iterRtSE3 = ConstructSE3_GN(rt6D);
+    iterRtSE3 = ConstructSE3(rt6D);
 
     //chain iterRtSE3 to rtSE3
     rtSE3 = iterRtSE3 * rtSE3;
@@ -128,22 +218,47 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const T
 
 
 
-
 const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const cv::Mat& depth, const cv::Mat& rgb, const TargetCloud& tgtCloud, const Transform& initialGuess, const cv::Mat& Last_intens) {
 
   //initial parameters
   std::cout<<"Meta ICP\n";
+  long t1, t2;
+  t1 = clock();
+  //RANSAC_strategy(srcCloud,tgtCloud);
   Transform initialGuess_I = Transform::Identity();
   Transform SO3Pose = SO3_prealign(initialGuess,rgb, 4);
   SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
   //SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
-
-  rtSE3 = SO3Pose;
-  rtSE3_1 = SO3Pose;
-  rtSE3_2 = SO3Pose;
-  rtSE3_3 = SO3Pose;
-  rtSE3_4 = SO3Pose;
   
+  rtSE3 = initialGuess;
+  rtSE3_1 = initialGuess;
+  rtSE3_2 = initialGuess;
+  rtSE3_3 = initialGuess;
+  rtSE3_4 = initialGuess;
+  
+  SourceCloud transformedCloudOri0(srcCloud.rows(), 6) ;
+  transformedCloudOri0.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+  transformedCloudOri0.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+  //kinectNoiseWeights = KinectNoiseWighting(transformedCloudOri0);
+  t2 = clock();
+  std::cout<<"\nSO3 time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+
+  MatchingByProject2DAndWalk(transformedCloudOri0, tgtCloud);
+  /*
+  t1 = clock();
+  RANSAC_strategy(transformedCloudOri0, tgtCloud);
+  Eigen::Vector<Scalar, 6> rt6D0;
+  rt6D0 = MinimizingP2PLErrorMetric(transformedCloudOri0(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+  Transform iterRtSE30;
+  iterRtSE30 = ConstructSE3(rt6D0);
+  rtSE3 = rtSE3 * iterRtSE30;
+  rtSE3_1 = rtSE3_1 * iterRtSE30;
+  rtSE3_2 = rtSE3_2 * iterRtSE30;
+  rtSE3_3 = rtSE3_3 * iterRtSE30;
+  rtSE3_4 = rtSE3_4 * iterRtSE30;
+  t2 = clock();
+  std::cout<<"\nRANSAC time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+  */
  /*
   rtSE3 = Transform::Identity();
   rtSE3_1 = Transform::Identity();
@@ -164,6 +279,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
   int iteration_divide = 20;
 
   last_inten = Last_intens;
+  t1 = clock();
+  computeDerivativeImages(last_rgb, dIdx, dIdy);
   while (true) {
   iterations+=1;
   //meta training
@@ -627,6 +744,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 			//std::cout<<"\ntransformedClouddepth_before20:\n"<<pLastCloud.rows()<<"\n\n";
 			//std::cout<<"\nCorres:\n"<<corrs<<"\n\n";
 			std::cout<<"hello~~~";
+			//RANSAC_strategy(transformedClouddepth_before20, tgtCloud);
 			rt6D1 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
 		}
 		else
@@ -676,6 +794,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		{
 			//rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
 			//rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
+			//RANSAC_strategy(transformedClouddepth2_before20, tgtCloud);
 			rt6D2 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_2, LastCloud_2);
 		}
 		else
@@ -726,6 +845,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		{
 			//rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
 			//rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
+			//RANSAC_strategy(transformedCloudrgb_before20, tgtCloud);
 			rt6D3 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_3, LastCloud_3);
 		}	
 		else
@@ -775,6 +895,7 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		{
 			//rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all));
 			//rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
+			//RANSAC_strategy(transformedCloudrgb2_before20, tgtCloud);
 			rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
 		}
 		else
@@ -832,16 +953,18 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
     //convert 6D vector to SE3
     Eigen::Vector<Scalar, 6> rt6D_L1_largest;
 	double s1, s2, s3, s4;
-	/*
+	
 	s1 = fabs(rt6D1(0))+fabs(rt6D1(1))+fabs(rt6D1(2));
 	s2 = fabs(rt6D2(0))+fabs(rt6D2(1))+fabs(rt6D2(2));
 	s3 = fabs(rt6D3(0))+fabs(rt6D3(1))+fabs(rt6D3(2));
 	s4 = fabs(rt6D4(0))+fabs(rt6D4(1))+fabs(rt6D4(2));
-	*/
+	
+	/*
 	s1 = fabs(rt6D1(3))+fabs(rt6D1(4))+fabs(rt6D1(5));
 	s2 = fabs(rt6D2(4))+fabs(rt6D2(4))+fabs(rt6D2(5));
 	s3 = fabs(rt6D3(4))+fabs(rt6D3(4))+fabs(rt6D3(5));
 	s4 = fabs(rt6D4(4))+fabs(rt6D4(4))+fabs(rt6D4(5));
+	*/
 	if((s1>=s2)&&(s1>=s3)&&(s1>=s4))
 	{
 		std::cout<<"\n\nHAHSAHAH\n\n";
@@ -910,13 +1033,15 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		break;
 	}
   }
-  
+  t2 = clock();
+  std::cout<<"\nMeta Training time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
   
   
   
   //meta testing
   //icp loop 2 START
   iteration_loop2 = 0;
+  t1 = clock();
   while (true) {
   iteration_loop2+=1;
   std::cout<<"\niter2: "<<iteration_loop2;
@@ -1376,6 +1501,12 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 	if (!MatchingByProject2DAndWalk(transformedCloudOri, tgtCloud)) {
 		break; // when correspondence size less than 6
 		}
+	/*
+	if(iteration_loop2 == 1){
+		RANSAC_strategy(transformedCloudOri, tgtCloud);
+	}
+	*/
+	std::cout<<"\ncorrs: "<<corrs.rows();
 	//rt6D = rt6D1;
 	rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 	//rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
@@ -1405,7 +1536,8 @@ const EAS_ICP::Transform& EAS_ICP::Register(const SourceCloud& srcCloud, const c
 		break;
 	}
   }
-  
+  t2 = clock();
+  std::cout<<"\nMeta Testing time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
   valid = true;
   return rtSE3;
 }
@@ -1584,12 +1716,14 @@ void EAS_ICP::PointRejectionByDepthRangeAndGeometryWeight2( const Cloud& cloud, 
 }
 
 void EAS_ICP::WeightedRandomSampling(int sampling_size, const std::vector<int>& roiInds, const std::vector<double>& weights, std::vector<int>& samplingInds) {
-  size_t N = roiInds.size ();  
+  //std::cout<<"\nHELLLO\n";
+  //std::cout<<"\nN:"<<roiInds.size();
+  size_t N = roiInds.size();  
   if (sampling_size >= N)
   {
     samplingInds = roiInds;
   } else {
-    samplingInds.resize (sampling_size);
+    samplingInds.resize(sampling_size);
     
     std::default_random_engine gen; 
     gen.seed(random_seed);
@@ -1640,10 +1774,8 @@ void EAS_ICP::CalculateNormal( const Cloud& cloud,  const std::vector<int>& samp
     int x = samplingInds[i] % width;
     int y = samplingInds[i] / width;
     std::vector<PointT> points;
-
     //reserve range size memory
     points.reserve(std::pow(2*normal_range+1, 2));
-
     //center epoint
     PointT p (
             cloud(samplingInds[i], 0),
@@ -1698,16 +1830,25 @@ void EAS_ICP::CalculateNormal( const Cloud& cloud,  const std::vector<int>& samp
       validNormalInds.push_back(i);
     }
   }
-
+  //std::cout<<"\nvalid size: :"<<validNormalInds.size();
+  if(validNormalInds.size() == 0){
+	  SourceCloud tmp(1, 6);
+	  tmp.row(0)<<0,0,0,0,0,0;
+	  tmp.swap(srcCloud); 
+	  return;
+  }
   //construct Source Cloud
   std::vector<int> validSrcCloudInds(validNormalInds.size());
+  
   for (int i = 0; i < validNormalInds.size(); ++i) {
     validSrcCloudInds[i] = samplingInds[validNormalInds[i]];
+	
   }
-
+ 
   SourceCloud tmp(validSrcCloudInds.size(), 6); 
   tmp.leftCols(3) = cloud(validSrcCloudInds, Eigen::all);
   tmp.rightCols(3) = normals(validNormalInds, Eigen::all);
+  
   tmp.swap(srcCloud);
 }
 const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud) {
@@ -1720,6 +1861,65 @@ const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud) {
   t_e1 = clock();
   EdgeDetection(cloud, edge_map, nan_map, rej_map);
   t_e2 = clock();
+  std::cout<<"edge detection cloud"<<std::endl;
+  //std::cout<<"\nedge MEAN: "<<cv::mean(edge_map).val[0]<<"\n";
+  if(cv::mean(edge_map).val[0] == 0){
+  	edge_map = (~nan_map) & (~rej_map);
+  }
+  std::cout<<double(t_e2-t_e1)/CLOCKS_PER_SEC<<std::endl;
+  
+  //calculate edge distance map
+  cv::Mat inv_edge_map;
+  inv_edge_map = ~edge_map;
+  
+  cv::Mat edge_distance_map;
+  clock_t t_d1, t_d2;
+  t_d1 = clock();
+  cv::distanceTransform(inv_edge_map, edge_distance_map, cv::DIST_L2, 5);
+  t_d2 = clock();
+  std::cout<<"distance_transform cloud"<<std::endl;
+  std::cout<<double(t_d2-t_d1)/CLOCKS_PER_SEC<<std::endl;
+  
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds;
+  std::vector<double> weights;
+  std::cout<<"Before Point Reject\n";
+  PointRejectionByDepthRangeAndGeometryWeight(cloud, edge_distance_map, nan_map | rej_map, remindPointInds, weights);
+  //input:edge_distance_map, output:weights set as 1
+  std::cout<<"After Point Reject\n";
+  //PointRejectionByDepthRangeAndGeometryWeight2(cloud, edge_map, nan_map | rej_map, remindPointInds, weights);
+
+  //cv::imwrite("edge.jpg", edge_map);
+  //sample depend on edge distance
+  std::vector<int> EASInds;
+  std::cout<<"Before Weight Random Sampling\n";
+  WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+  std::cout<<"After Weight Random Sampling\n";
+  //calculate normal
+  std::cout<<"Before Calculate Normal\n";
+  CalculateNormal(cloud, EASInds, mSrcCloud);
+  std::cout<<"After Calculate Normal\n";
+  //weighting
+  kinectNoiseWeights = KinectNoiseWighting(mSrcCloud);
+  
+  return mSrcCloud;
+}
+const EAS_ICP::SourceCloud& EAS_ICP::JustSampling(const Cloud& cloud) {
+  //sampling
+  //edge detection
+  cv::Mat edge_map;
+  cv::Mat nan_map;
+  cv::Mat rej_map;
+  clock_t t_e1, t_e2;
+  t_e1 = clock();
+  EdgeDetection(cloud, edge_map, nan_map, rej_map);
+  //edge_map.setTo(255, cv::abs(edge_map) > 0);
+  //edge_map = cv::Mat::zeros(480, 640, CV_8UC1);
+  //edge_map.setTo(255, cv::abs(edge_map) > 0);
+  edge_map = (~nan_map) & (~rej_map);
+  t_e2 = clock();
+  //cv::imwrite("just_depth.jpg", edge_map);
+  std::cout<<"\nedge MEAN: "<<cv::mean(edge_map).val[0];
   std::cout<<"edge detection cloud"<<std::endl;
   std::cout<<double(t_e2-t_e1)/CLOCKS_PER_SEC<<std::endl;
   
@@ -1744,7 +1944,7 @@ const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud) {
   std::cout<<"After Point Reject\n";
   //PointRejectionByDepthRangeAndGeometryWeight2(cloud, edge_map, nan_map | rej_map, remindPointInds, weights);
 
-  
+  //cv::imwrite("edge.jpg", edge_map);
   //sample depend on edge distance
   std::vector<int> EASInds;
   std::cout<<"Before Weight Random Sampling\n";
@@ -1759,7 +1959,6 @@ const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud) {
   
   return mSrcCloud;
 }
-
 
 //EdgeAwareSampling  cloud& rgb 
 const EAS_ICP::SourceCloud& EAS_ICP::EdgeAwareSampling(const Cloud& cloud, const cv::Mat& rgb) {
@@ -2319,13 +2518,12 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 		A_icp += Temp;
 		b_icp += Temp_b;
   	}
-	cv::Mat dIdx;
-	cv::Mat dIdy;
+	//cv::Mat dIdx;
+	//cv::Mat dIdy;
 	A_term A_rgb;
 	b_term b_rgb;
-
-	EAS_ICP::computeDerivativeImages(rgb, dIdx, dIdy);
-
+	//EAS_ICP::computeDerivativeImages(rgb, dIdx, dIdy);
+	//std::cout<<"\nDerivativeImages time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
 	EAS_ICP::RGBJacobianGet(dIdx, dIdy, depth, rgb, rgb_last, tgtCloud, resultRt ,A_rgb, b_rgb, LastCloud);
 	
 
@@ -2339,19 +2537,35 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 	A_rgb = A_rgb;
 	b_rgb = b_rgb;
 	float iterations_final = iterations/100;
+	//if(iterations < 20){
+
 	if(iterations < 20){
 		iterations_final = 0;
 		wt = 1;
 	}
 	else{
-		iterations_final = 0.00025;
-		wt = 150;
+		//iterations_final = 1;
+			double quality_rate = depth_quality/rgb_quality;
+
+			iterations_final = 0.0001;
+		
+		//wt = 1000;
+
+			
+			wt = 10 * quality_rate;
+			//wt = 10;
+			std::cout<<"\nquality rate: "<< depth_quality/rgb_quality<<"\n";
+			if(depth_quality == 0 || rgb_quality == 0){
+				wt = 10;
+			}
+			//wt = 10;
 	}
+
 	A_all = A_rgb * iterations_final * iterations_final + A_icp*wt*wt;
 	b_all = b_rgb * iterations_final + b_icp*wt;
 	//ret = A_icp.ldlt().solve(b_icp);
-	//retRGB = A_rgb.ldlt().solve(b_rgb);
 	retAll = A_all.ldlt().solve(b_all);
+	//retAll = A_all.ldlt().solve(b_all);
 	/*
 	std::cout<<"\n-------------------------\n"; 
 	std::cout<<"src:\n"<<srcCloud.row(0)<<"\n";
@@ -2362,11 +2576,11 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 	std::cout<<"result:\n"<<ret<<"\n";
 	std::cout<<"\n-------------------------\n";
 	*/
-	//std::cout<<"b_icp:\n"<<b_icp * wt<<"\n";
-	//std::cout<<"b_rgb:\n"<<b_rgb * iterations_final<<"\n";
+	std::cout<<"b_icp:\n"<<b_icp * wt<<"\n";
+	std::cout<<"b_rgb:\n"<<b_rgb * iterations_final<<"\n";
 	//std::cout<<"resultICP:\n"<<ret<<"\n";
 	//std::cout<<"resultRGB:\n"<<retRGB<<"\n";
-	//std::cout<<"resultAll:\n"<<retAll<<"\n";
+	std::cout<<"resultAll:\n"<<retAll<<"\n";
   	return retAll;
 }
 //reference linear least-square Optimization of p2pl ICP
@@ -2423,8 +2637,8 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	cv::Mat inten_last;
 	cv::Mat hsv;
 	cv::Mat hsv_last;
-	cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
-	cv::cvtColor(rgb_last, inten_last, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(rgb, inten_last, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(rgb_last, inten, cv::COLOR_BGR2GRAY);
 	cv::cvtColor(rgb, hsv, cv::COLOR_BGR2HSV);
 	cv::cvtColor(rgb_last, hsv_last, cv::COLOR_BGR2HSV);
 	K(0, 0) = fx;//fx
@@ -2439,39 +2653,59 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 
 	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> KRK_inv = K * R * K.inverse();
 
+
 	Eigen::Vector3d Kt = Rt.topRightCorner(3, 1);
 	Kt = K * Kt;
-	int total = 0;
+
+	//std::cout<<"\nt:\n"<<K.inverse() * Kt;
+	//std::cout<<"\nKRKinv:\n"<<KRK_inv;
+	//std::cout<<"\nKRKinv(1,0):\n"<<KRK_inv(1,0);
+	//std::cout<<"\nRt:\n"<<Rt;
+	//std::cout<<"\nR:\n"<<R;
+	float total = 0;
 	A_term Temp;
 	b_term Temp_b;
 	int count = 0;
 	for (int y = 0; y < 480; ++y){
 		for (int x = 0; x<640; ++x){
 			//float d1 = tgtCloud.row(640*y + x)(2) * 5000;
-			float d1 = (float)next_depth.at<short>(y, x);
+			float d1 = (float)next_depth.at<short>(y, x) / 1000;
+
+			for(int u = std::max(y - 2, 0); u < std::min(x + 2, 480); u++)
+			{
+				for(int v = std::max(x - 2, 0); v < std::min(x + 2, 640); v++)
+				{
+					if((float)inten.at<uchar>(y, x) <= 0){
+						continue;
+					}
+				}
+			}
 
 			if(!isnan(d1) && d1 > 0){
 				float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-				int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
-				int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
+				int u0 = round((d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1);
+				int v0 = round((d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1);
 				//std::cout<<"\nd1:  "<<d1;
-				//std::cout<<"\nd2:  "<<d2;
+				//std::cout<<"\ntrans d1:  "<<transformed_d1;
 				
 				
 				//std::cout<<"\nd2_trans:  "<<transformed_d2;
 				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
-				float d0 = (float)last_depth.at<short>(v0, u0);
+				//float d0 = (float)last_depth.at<short>(v0, u0) / 1000;
 
 				short valX = dIdx.at<short>(y, x);
 				short valY = dIdy.at<short>(y, x);
-				short mTwo = valX * valX + valY * valY;
-
+				float mTwo = valX * valX + valY * valY;
+				
+				//std::cout<<"\nValx: "<<valX<<" Valy: "<<valY;
+				//std::cout<<"\nmTwo: "<<mTwo;
+				
 				//if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<40 && mTwo>1600){
 				if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
 
-					float d0 = (float)last_depth.at<short>(v0, u0);
+					float d0 = (float)last_depth.at<short>(v0, u0) / 1000;
 
-					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
+					if(d0>0 && std::abs(transformed_d1-d0)<=0.07 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
 						//std::cout<<"\nd0:  "<<d0;
 						//std::cout<<"\nd1_trans:  "<<transformed_d1;
 						//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
@@ -2479,13 +2713,14 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 						//std::cout<<"\nd1:  "<<d1;
 						//std::cout<<"\nd0:  "<<d0;
 						
-						int t = (int)inten.at<char>(y, x);
-						int s = (int)inten_last.at<char>(v0, u0);
-
+						float t = (float)inten.at<uchar>(y, x);
+						float s = (float)inten_last.at<uchar>(v0, u0);
+						//std::cout<<"\nintens target: "<<t;
+						//std::cout<<"\nintens source: "<<s;
 						int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
 						int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
 
-						int diff = t-s;
+						float diff = t-s;
 						//int diff = alfa - beta;
 						total += (diff*diff);
 						count++;
@@ -2494,10 +2729,12 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 			}
 		}
 	}
-	float delta = sqrt((float)total/(float)count);
+	float delta = std::sqrt((float)total/count == 0 ? 1 : count);
+	
 	std::cout<<"\ncount: "<<count;
 	std::cout<<"\ntotal: "<<total;
 	std::cout<<"\ndelta: "<<delta;
+	
 	total = 0;
 	count = 0;
 	for (int y = 0; y < 480; ++y){
@@ -2507,65 +2744,75 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 			//condition check
 
 
-			float d1 = (float)next_depth.at<short>(y, x);
+			float d1 = (float)next_depth.at<short>(y, x) / 1000;
 			if(!isnan(d1) && d1 > 0){
 				float transformed_d1 = (float)(d1 * (KRK_inv(2,0) * x + KRK_inv(2,1) * y + KRK_inv(2,2)) + Kt(2));
-				int u0 = (d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1;
-				int v0 = (d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1;
+				int u0 = round((d1 * (KRK_inv(0,0) * x + KRK_inv(0,1) * y + KRK_inv(0,2)) + Kt(0)) / transformed_d1);
+				int v0 = round((d1 * (KRK_inv(1,0) * x + KRK_inv(1,1) * y + KRK_inv(1,2)) + Kt(1)) / transformed_d1);
 				//std::cout<<"\nd1:  "<<d1;
 				//std::cout<<"\nd2:  "<<d2;
 				
 				short valX = dIdx.at<short>(y, x);
 				short valY = dIdy.at<short>(y, x);
-				short mTwo = valX * valX + valY * valY;
+				float mTwo = valX * valX + valY * valY;
 				//std::cout<<"\nd2_trans:  "<<transformed_d2;
 				//float d0 = LastCloud.row(640*v0 + u0)(2) * 1000;
 				//float d0 = (float)last_depth.at<short>(v0, u0);
 				
 				//if(u0>0 && u0<640 && v0<480 && v0>0 && !isnan(d1) && d0>0 && std::abs(transformed_d1-d0)<70 && mTwo > 1600){
 				if(u0 >= 0 && v0 >= 0 && u0 < 640 && v0 < 480){
-					float d0 = (float)last_depth.at<short>(v0, u0);
-					if(d0>0 && std::abs(transformed_d1-d0)<70 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
+					float d0 = (float)last_depth.at<short>(v0, u0) / 1000;
+					if(d0>0 && std::abs(transformed_d1-d0)<=0.07 && (inten_last.at<uchar>(v0, u0) != 0) && (mTwo > 1600) && (inten.at<uchar>(y, x) > 0)){
 						//std::cout<<"\nd0:  "<<d0;
 						//std::cout<<"\nd1_trans:  "<<transformed_d1;
 						//std::cout<<"\n(x, y): "<<"("<<x<<", "<<y<<")";
 						//std::cout<<"\n(u0, v0): "<<"("<<u0<<", "<<v0<<")";
 						//std::cout<<"\nd1:  "<<d1;
 						//std::cout<<"\nd0:  "<<d0;
-						
-						int t = (int)inten.at<char>(y, x);
-						int s = (int)inten_last.at<char>(v0, u0);
+						for(int u = std::max(y - 2, 0); u < std::min(x + 2, 480); u++)
+						{
+							for(int v = std::max(x - 2, 0); v < std::min(x + 2, 640); v++)
+							{
+								if((float)inten.at<uchar>(y, x) <= 0){
+									continue;
+								}
+							}
+						}
+
+						float t = (float)inten.at<uchar>(y, x);
+						float s = (float)inten_last.at<uchar>(v0, u0);
 
 						int alfa = (int)hsv.at<cv::Vec3b>(y, x)[0];
 						int beta = (int)hsv_last.at<cv::Vec3b>(v0, u0)[0];
 
-						int diff = t-s;
+						float diff = t-s;
 						//int diff = alfa-beta;
 						//std::cout<<"\nintens: "<<diff<<"   hsv: "<<diffhsv;
 						float w =  std::abs(diff) + delta;
 						w = w > FLT_EPSILON ? 1.0 / w : 1.0;
 						//std::cout<<"\ndiff:  "<<diff;
-						float cloud_x = LastCloud.row(640*v0 + u0)(0);
-						float cloud_y = LastCloud.row(640*v0 + u0)(1);
-						float cloud_z = LastCloud.row(640*v0 + u0)(2);
+						float cloud_x = (float)LastCloud.row(640*v0 + u0)(0);
+						float cloud_y = (float)LastCloud.row(640*v0 + u0)(1);
+						float cloud_z = (float)LastCloud.row(640*v0 + u0)(2);
 						//std::cout<<"\nd0:  "<<d0;
 						//std::cout<<"\nz:  "<<cloud_z;
 						float invz = 1/cloud_z;
-						float dI_dx_val = w * dIdx.at<short>(y, x)/8;
-						float dI_dy_val = w * dIdy.at<short>(y, x)/8;
-						float v0 = dI_dx_val * fx * invz;
-						float v1 = dI_dy_val * fy * invz;
+						float dI_dx_val = w * dIdx.at<short>(y, x) * 0.125;
+						float dI_dy_val = w * dIdy.at<short>(y, x) * 0.125;
+						float v0 = dI_dx_val * K(0, 0) * invz;
+						float v1 = dI_dy_val * K(1, 1) * invz;
 						float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
-						//sstd::cout<<"\ndI_dx_val:  "<<dI_dx_val;
+						//std::cout<<"\ndI_dx_val:  "<<dI_dx_val;
+						//std::cout<<"\ndI_dx:  "<<dIdx.at<short>(y, x);
 						double a,b,c,d,e,f,g;
 
 						a = v0;
 						b = v1;
 						c = v2;
-						d = -cloud_z * v1 + cloud_y * v2;
+						d = (-cloud_z * v1) + cloud_y * v2;
 						e = cloud_z * v0 - cloud_x * v2;
-						f = -cloud_y * v0 + cloud_x * v1;
-						g = -w * diff;
+						f = (-cloud_y * v0) + cloud_x * v1;
+						g = (-w) * diff;
 						//std::cout<<"\npoint: ("<<cloud_x<<", "<<cloud_y<<", "<<cloud_z<<")";
 						//std::cout<<"\na :"<<a;
 						//std::cout<<"\nb :"<<b;
@@ -2574,6 +2821,10 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 						//std::cout<<"\ne :"<<e;
 						//std::cout<<"\nf :"<<f;
 						//std::cout<<"\ng :"<<g;
+
+						Temp = Eigen::MatrixXd::Zero(6, 6);
+						Temp_b = Eigen::MatrixXd::Zero(6, 1);
+
 						Temp(0,0) = a * a;
 						Temp(0,1) = Temp(1,0) = a * b;
 						Temp(0,2) = Temp(2,0) = a * c;
@@ -2608,11 +2859,14 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 						Temp_b(4,0) = e * g;
 						Temp_b(5,0) = f * g;
 
+						//std::cout<<"\n\nrgb_b: "<<b_rgb;
 						A_rgb += Temp;
 						b_rgb += Temp_b;
 
 						count++;
 						total += (diff * diff);
+						
+						//std::cout<<"\ntemp_b: "<<Temp_b;
 						//std::cout<<"\ndI_dx_val: "<<dI_dx_val;
 						//std::cout<<"\ndI_dx: "<<(int)dIdx.at<char>(y, x);
 						//std::cout<<"\ncoord:  "<<"("<<u0<<","<<v0<<")";
@@ -2627,9 +2881,11 @@ void EAS_ICP::RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv:
 	//std::cout<<"\nb_rgb: "<<b_rgb<<"\n";
 	//std::cout<<"\nret: "<<ret<<"\n";
 	float average = sqrt((float)total/(float)count);
+	/*
 	std::cout<<"\ncount: "<<count<<"\n";
 	std::cout<<"\ntotal loss: "<<total<<"\n";
 	std::cout<<"\naverage: "<<average<<"\n";
+	*/
 }
 void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud){
 	A_rgb = Eigen::MatrixXd::Zero(6, 6);
@@ -2708,9 +2964,11 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 		}
 	}
 	float delta = sqrt((float)total/(float)count);
+	/*
 	std::cout<<"\ncount: "<<count;
 	std::cout<<"\ntotal: "<<total;
 	std::cout<<"\ndelta: "<<delta;
+	*/
 	total = 0;
 	count = 0;
 	for(int i = 0; i < corrs.rows(); i++){
@@ -2727,8 +2985,8 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 		//std::cout<<"\nd1:  "<<d1;
 		//std::cout<<"\nd2:  "<<d2;
 
-		float valX = dIdx.at<float>(y, x);
-		float valY = dIdy.at<float>(y, x);
+		float valX = dIdx.at<short>(y, x);
+		float valY = dIdy.at<short>(y, x);
 		float mTwo = valX * valX + valY * valY;
 		//std::cout<<"\nmTwo:  "<<mTwo;
 		//std::cout<<"\nd2_trans:  "<<transformed_d2;
@@ -2762,8 +3020,8 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 			float cloud_z = LastCloud.row(640*v0 + u0)(2);
 
 			float invz = 1/cloud_z;
-			float dI_dx_val = w * dIdx.at<float>(y, x)/8;
-			float dI_dy_val = w * dIdy.at<float>(y, x)/8;
+			float dI_dx_val = w * dIdx.at<float>(y, x) * 0.125;
+			float dI_dy_val = w * dIdy.at<float>(y, x) * 0.125;
 			float v0 = dI_dx_val * fx * invz;
 			float v1 = dI_dy_val * fy * invz;
 			float v2 = -(v0 * cloud_x + v1 * cloud_y) * invz;
@@ -2838,9 +3096,11 @@ void EAS_ICP::RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, con
 	//std::cout<<"\nb_rgb: "<<b_rgb<<"\n";
 	//std::cout<<"\nret: "<<ret<<"\n";
 	float average = sqrt((float)total/(float)count);
+	/*
 	std::cout<<"\ncount: "<<count<<"\n";
 	std::cout<<"\ntotal loss: "<<total<<"\n";
 	std::cout<<"\naverage: "<<average<<"\n";
+	*/
 }
 void EAS_ICP::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat& dIdy){
   float gsx3x3[9] = {-0.52201,  0.00000, 0.52201,
@@ -2860,8 +3120,8 @@ void EAS_ICP::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat
   cv::filter2D( intensity, dIdy, CV_16S , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
   //dIdx = dIdx * (-1);
   //dIdy = dIdy * (-1);
-  //cv:: Sobel(intensity, dIdx, CV_32F, 1, 0, 1);
-  //cv:: Sobel(intensity, dIdy, CV_32F, 0, 1, 1);
+  //cv:: Sobel(intensity, dIdx, CV_16S, 1, 0, 1);
+  //cv:: Sobel(intensity, dIdy, CV_16S, 0, 1, 1);
   //std::cout<<dIdx;
   //std::cout<<dIdx.at<float>(10,10);
 
@@ -4451,8 +4711,8 @@ EAS_ICP::Transform EAS_ICP::SO3_prealign(EAS_ICP::Transform Pose_in, const cv::M
 
 	cv::Mat intensity;
 	cv::Mat last_intensity;
-  	cv::cvtColor(rgb, intensity, cv::COLOR_BGR2GRAY);
-	cv::cvtColor(last_rgb, last_intensity, cv::COLOR_BGR2GRAY);
+  	cv::cvtColor(last_rgb, intensity, cv::COLOR_RGB2GRAY);
+	cv::cvtColor(rgb, last_intensity, cv::COLOR_RGB2GRAY);
 
 	Eigen::Matrix<double, 3, 3, Eigen::RowMajor> K = Eigen::Matrix<double, 3, 3, Eigen::RowMajor>::Zero();
 	cv::Mat rgb_in;
@@ -4605,13 +4865,268 @@ EAS_ICP::Transform EAS_ICP::SO3_prealign(EAS_ICP::Transform Pose_in, const cv::M
 	Rt.topLeftCorner(3, 3) = resultR.inverse();
 
 	//if(resultDelta.norm()>0.05 || Trans_in.norm() > 0.02){
-	if(resultDelta.norm() > 0.05 || Trans_in.norm() > 0.05){
+	
+	if(resultDelta.norm() > 0.05|| Trans_in.norm() > 0.05){
 		//Rt = Transform::Identity();
 		Rt = Pose_in;
 	}
+	
 	//std::cout<<"\n"<<Rt<<"\n";
 	//Rt = Transform::Identity();
 	//Rt.topRightCorner(3, 1) = Trans_in;
 	return Rt;
 
+}
+
+bool EAS_ICP::RANSAC_strategy(const SourceCloud& srcCloud, const TargetCloud& tgtCloud){
+	
+	int samp_times = 50;
+	float samp_rate = 0.4;
+	int all_num = srcCloud.rows();
+	int samp_point = (int)(all_num * samp_rate);
+
+	int max_corrs_num = 0;
+	Eigen::Vector<Scalar, 6> rt6D_ransac;
+	Eigen::Matrix<int, Eigen::Dynamic, 2, Eigen::RowMajor> RANSAC_corrs_final;
+	srand( time(NULL) );
+	for (int i = 0; i<samp_times; i++){
+		
+
+		char src_subset[srcCloud.rows()] = {0};
+		//Sampling 70% of point from source
+		int total = 0;
+		SourceCloud srcTemp(samp_point,6);
+		SourceCloud srcCpy = srcCloud;
+		while (total < samp_point){   
+				
+			int idx_rand = rand()%all_num;
+			//std::cout<<"idx rand:"<<idx_rand<<"\n";
+			if(src_subset[idx_rand] == 0){
+				src_subset[idx_rand] = 1;
+				total++;
+			}
+
+			//std::cout<<"final idx: "<<final_idx<<"\n";
+		}
+
+		int idx_tmp = 0;
+		for (int n = 0; n < all_num; n++){
+			if(src_subset[n] == 1){
+				srcTemp.row(idx_tmp) = srcCloud.row(n);
+				idx_tmp++;
+			}
+		}
+		std::cout<<"\nidx_tmp: "<<idx_tmp;
+		Eigen::Matrix<Scalar, Eigen::Dynamic, 1> kinectNoiseWeights;
+		kinectNoiseWeights = KinectNoiseWighting(srcTemp);
+		MatchingByProject2DAndWalk(srcTemp, tgtCloud);
+
+		//std::cout<<corrs;
+
+		std::cout<<"\ncorr:"<<corrs.rows();
+		//std::cout<<"\ncorr:"<<corrs;
+		Transform SE3_ransac;
+		rt6D_ransac = MinimizingP2PLErrorMetric(srcTemp(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		SE3_ransac = ConstructSE3(rt6D_ransac);
+
+		srcCpy.leftCols(3) = ((SE3_ransac.topLeftCorner<3,3>()* srcCpy.leftCols<3>().transpose()).colwise() + SE3_ransac.col(3).head<3>()).transpose();
+		srcCpy.rightCols(3) = (SE3_ransac.topLeftCorner<3,3>()* srcCpy.rightCols<3>().transpose()).transpose();
+		MatchingByProject2DAndWalkRANSAC(srcCpy, tgtCloud);
+		std::cout<<"\ncorr after:"<<corrs.rows();
+		
+		if(corrs.rows() > max_corrs_num){
+
+			//Eigen::Matrix<int, Eigen::Dynamic, 2, Eigen::RowMajor> RANSAC_final;
+			max_corrs_num = corrs.rows();
+			RANSAC_corrs_final = corrs;
+		}
+
+		for (int z = 0; z < samp_point; z++){
+
+			srcTemp.row(z)<<0, 0, 0, 0 ,0, 0;
+		}
+
+		std::cout<<"\nPose:\n"<<SE3_ransac;
+	}
+	//corrs = RANSAC_corrs_final;
+	//std::cout<<"\nfinal map:"<<RANSAC_corrs_final.rows();
+	//SourceCloud srcFinal(RANSAC_corrs_final.rows(),6);
+
+	MatchingByProject2DAndWalk(srcCloud, tgtCloud);
+	//char final_map[corrs.rows()] = {0};
+	int replace_count = 0;
+	for(int k = 0; k < RANSAC_corrs_final.rows(); k++){
+		int replace_valid = 0;
+		//final_map[RANSAC_corrs_final(k, 0)] = 1;
+		
+		for(int j= 0; j < corrs.rows(); j++){
+			if(RANSAC_corrs_final(k,0) == corrs(j,0)){
+				
+				RANSAC_corrs_final.row(k) = corrs.row(j);
+				//std::cout<<"\nk: "<<k;
+				replace_valid = 1;
+				replace_count++;
+			}
+		}
+		if(replace_valid == 0){
+			//std::cout<<"\nGot it: "<<k;
+			RANSAC_corrs_final.row(k)<<9999,9999;
+			
+		}
+	}
+	Eigen::Matrix<int, Eigen::Dynamic, 2, Eigen::RowMajor> final_RANSAC(replace_count, 2);
+	int idx_rans = 0;
+	for(int k = 0; k < RANSAC_corrs_final.rows(); k++){
+		if(RANSAC_corrs_final(k,0) != 9999 && RANSAC_corrs_final(k,1) != 9999){
+			final_RANSAC.row(idx_rans) = RANSAC_corrs_final.row(k);
+			idx_rans++;
+		}
+	}
+	//corrs = RANSAC_corrs_final;
+	//std::cout<<"\nRANSAC Final: "<<RANSAC_corrs_final;
+	//srcFinal = srcCloud(RANSAC_corrs_final.col(0), Eigen::all);
+	std::cout<<"\nidx_rans:"<<idx_rans;
+	
+	//std::cout<<"\nOrigin"<<corrs;
+	//MatchingByProject2DAndWalk(srcFinal, tgtCloud);
+	//std::cout<<"\nAfter RANSAC"<<corrs;
+	std::cout<<"\nfinal_RANSAC: "<<final_RANSAC.rows();
+	//std::cout<<"\nfinal_RANSAC: "<<final_RANSAC;
+	if(final_RANSAC.rows() > 10){
+		corrs = final_RANSAC;
+	}
+
+
+}
+bool EAS_ICP::MatchingByProject2DAndWalkRANSAC(const SourceCloud& srcCloud, const TargetCloud& tgtCloud) {
+  int size = srcCloud.rows();
+  //correspondence declare
+  std::vector<std::tuple<Scalar, int, int>> stdCorrs; 
+  std::vector<double> residual_vector;
+
+  int corr_cnt= 0;
+
+  //for all correspondence
+  for (int i = 0; i < size; ++i) {
+    //a source point
+    const Scalar& src_px = srcCloud(i, 0);
+    const Scalar& src_py = srcCloud(i, 1);
+    const Scalar& src_pz = srcCloud(i, 2);
+
+    // project to 2D target frame
+    int x_warp = fx / src_pz*src_px +cx;
+    int y_warp = fy / src_pz*src_py +cy;
+    //declare and initial variables
+    Scalar min_distance = std::numeric_limits<Scalar>::max();
+    int target_index = -1;
+
+    //check the 2D point in target frame range
+    if (x_warp >= width || y_warp >= height || x_warp < 0 || y_warp < 0)
+    {
+      continue;
+    }
+
+    //search range
+    for (int ix = -search_range; ix < search_range + 1 ; ++ix)
+    {
+      for (int iy = -search_range; iy < search_range + 1 ; ++iy)
+      {
+        // search a circle range
+        int grid_distance2 = ix*ix + iy*iy;
+        if (grid_distance2 > search_range* search_range)
+        {
+          continue;
+        }
+        // x index and y index of target frame
+        int x_idx = x_warp + ix * search_step;
+        int y_idx = y_warp + iy * search_step;
+
+        // avoid index out of target frame
+        if (x_idx >= (width)
+          || x_idx < 0
+          || y_idx >=height
+          || y_idx < 0)
+        {
+          continue;
+        }
+
+        //calculate 1D target frame index
+        int tmp_index = (y_idx * width + x_idx);
+
+        // get x,y,z of target point
+        double tgt_px = tgtCloud(tmp_index,0);
+        double tgt_py = tgtCloud(tmp_index,1);
+        double tgt_pz = tgtCloud(tmp_index,2);
+
+        //check nan
+        if(
+             (tgt_px!= tgt_px)||
+             (tgt_py!= tgt_py)||
+             (tgt_pz!= tgt_pz)
+          ) continue; 
+
+
+        //calculate the distance between source point and target point
+        double distance = sqrt((src_px - tgt_px)*(src_px - tgt_px)
+          + (src_py - tgt_py)*(src_py - tgt_py)
+          + (src_pz - tgt_pz)*(src_pz - tgt_pz));
+
+        // if new distance is less than min distance => record this index and distance
+        if (distance < min_distance)
+        {
+          min_distance = distance;
+          target_index = tmp_index;// target index: height x width x pointsize //pointsize is 6
+        }
+      }
+    }
+    //image boundary rejection
+    //check closet point whether in the margin of boundary
+    int target_x = target_index % width;
+    int target_y = target_index / width;
+    if (target_x > right_bound|| target_x < left_bound || target_y > bottom_bound || target_y < top_bound) {
+      continue;
+    }
+    //check closet point existed and smaller fix threshold of rejection ==> if true, this pair is correspondence, and store in vector stdCorrs
+    Eigen::Vector3d src_n = srcCloud.row(i).rightCols(3);
+	SourceCloud Tgt_normal;
+	std::vector<int> tgt_idx{ target_index };
+	CalculateNormal(tgtCloud, tgt_idx, Tgt_normal);
+	Eigen::Vector3d tgt_n2 = Tgt_normal.row(0).rightCols(3);
+	double sine = tgt_n2.cross(src_n).norm();
+	if ( min_distance !=  std::numeric_limits<Scalar>::max() && min_distance < 0.02 && sine < 0.2 && tgt_n2.norm() != 0)
+    {
+      stdCorrs.push_back(std::make_tuple(min_distance, i, target_index));
+      residual_vector.push_back(min_distance);
+      ++corr_cnt;
+    }
+  }
+  //dynamic rejction
+  //calculate the real index from the ratio of dynamic threshold
+  int dynamic_threshold_index = dynamic_threshold_rejection * residual_vector.size();
+
+  //check the index is not over the vector size
+  if (dynamic_threshold_index < residual_vector.size()) {
+      //rejection theshold(unit:m)
+      //calculate the real value corresponded the index
+      std::nth_element(residual_vector.begin(), residual_vector.begin() + dynamic_threshold_index, residual_vector.end());
+      float reject_distance_threshold = 0; 
+      //check the vector is no empty, or segmentation fault would occur.
+      if (residual_vector.size() > 0)
+        reject_distance_threshold = residual_vector[dynamic_threshold_index];
+      
+      //erase the correspondence over the dynamic threshold
+      stdCorrs.erase(std::remove_if(stdCorrs.begin(), stdCorrs.end(), [reject_distance_threshold](const std::tuple<double, int,int>& elem){ return std::get<0>(elem)>reject_distance_threshold;}), stdCorrs.end());
+  }
+
+  //change the type for meeting the function output requirement
+  int final_size = stdCorrs.size();
+  Eigen::Matrix<int, Eigen::Dynamic, 2, Eigen::RowMajor> correspondences(final_size, 2);
+  for (int i = 0; i < stdCorrs.size(); ++i) {
+    correspondences(i, 0) = std::get<1>(stdCorrs[i]);
+    correspondences(i, 1) = std::get<2>(stdCorrs[i]);
+  }
+  correspondences.swap(corrs);
+
+  //check the correspondence size over 6 for solving 6 rt valuables
+  return corrs.rows() >=6;
 }

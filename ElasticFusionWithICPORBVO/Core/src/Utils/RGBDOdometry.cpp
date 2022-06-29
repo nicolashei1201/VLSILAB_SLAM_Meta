@@ -543,13 +543,21 @@ void RGBDOdometry::getIncrementalTransformation(Eigen::Vector3f & trans,
             Eigen::Matrix<double, 6, 6, Eigen::RowMajor> dA_icp = A_icp.cast<double>();
             Eigen::Matrix<double, 6, 1> db_rgbd = b_rgbd.cast<double>();
             Eigen::Matrix<double, 6, 1> db_icp = b_icp.cast<double>();
-
+            std::cout<<"rgbd:\n"<<db_rgbd<<"\n\n";
+            std::cout<<"icp:\n"<<db_icp<<"\n";
+            //std::cout<<"\nw: "<<w;
+            std::cout<<"\nsigmaVal: "<<sigmaVal;
+            std::cout<<"\nsigma: "<<sigma<<"\n";
+            std::cout<<"\nsobelScale: "<<sobelScale<<"\n";
+            std::cout<<"\nrgbSizecd : "<<rgbSize<<"\n";
+            std::cout<<"\nminSobScal : "<<pow(minimumGradientMagnitudes[i], 2.0) / pow(sobelScale, 2.0)<<"\n";
             if(icp && rgb)
             {
                 double w = icpWeight;
                 lastA = dA_rgbd + w * w * dA_icp;
                 lastb = db_rgbd + w * db_icp;
                 result = lastA.ldlt().solve(lastb);
+                
             }
             else if(icp)
             {

@@ -33,6 +33,7 @@ int main(int argc,  char *argv[])
   cv::Mat target_rgb = cv::imread(argv[4], -1);
 
   cv::Mat dIdx, dIdy;
+  cv::Mat dDdx, dDdy, dDAll;
   float gsx3x3[9] = {-0.52201,  0.00000, 0.52201,
                    -0.79451, -0.00000, 0.79451,
                    -0.52201,  0.00000, 0.52201};
@@ -48,21 +49,47 @@ int main(int argc,  char *argv[])
   cv::Mat kernelY(3, 3, CV_32F, gsy3x3);
   cv::filter2D( intensity, dIdx, CV_16S , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
   cv::filter2D( intensity, dIdy, CV_16S , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
-  //dIdx = dIdx * (-1);
-  std::cout<<(int)intensity.at<char>(1,1)<<"\n";
-  std::cout<<(int)intensity.at<char>(2,1)<<"\n";
-  std::cout<<(int)intensity.at<char>(3,1)<<"\n";
-  std::cout<<(int)intensity.at<char>(1,3)<<"\n";
-  std::cout<<(int)intensity.at<char>(2,3)<<"\n";
-  std::cout<<(int)intensity.at<char>(3,3)<<"\n";
-  std::cout<<"answer:\n";
-  //std::cout<<dIdx.at<short>(2,2);
-  std::cout<<dIdx;
-  std::cout<<dIdy;
+  
+  cv::Mat m2;
+  cv::Mat RGB_ALL;
+  cv::normalize(target_depth, m2, 0, 255, cv::NORM_MINMAX);
+  m2.convertTo(m2, CV_8U);
+  cv::Canny(m2, dDdx, 150, 100);
+  cv::Mat RGBD_edge;
+  RGB_ALL = cv::abs(dIdx | dIdy);
+  RGB_ALL.setTo(0, cv::abs(RGB_ALL) < 60);
+  RGB_ALL.setTo(255, cv::abs(RGB_ALL) > 60);
+  RGB_ALL.convertTo(RGB_ALL, CV_8U);
+  RGBD_edge = cv::abs( RGB_ALL & dDdx);
+
+  std::cout<<"\nDepth Canny Mean: "<<cv::mean(dDdx).val[0]<<"\n";
+  cv::Mat RGBCanny;
+  cv::Canny(target_rgb, RGBCanny, 250, 200);
+  /*
+  cv:: Sobel(m2, dDdx, CV_16S, 1, 0, 1);
+  cv:: Sobel(m2, dDdy, CV_16S, 0, 1, 1);
+  dDdx = cv::abs(dDdx);
+  dDdy = cv::abs(dDdy);
+  dDAll = cv::abs(dDdy | dDdx);
+  dDAll.setTo(0, cv::abs(dDAll) < 5);
+  dDAll.setTo(255, cv::abs(dDAll) > 5);
+  */
+ 
+  cv::imwrite("depth_Canny.png", dDdx);
+  cv::imwrite("RGBD_Edge.png", RGBD_edge);
+  cv::imwrite("RGB_CAnny.png", RGBCanny);
+  //cv::imwrite("depth_Ylook.png", dDdy);
+  //cv::imwrite("depth_Alllook.png", dDAll);
+  
+  
+  //cv::filter2D( source_depth, dDdx, CV_16S , kernelX, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
+  
+  //cv::filter2D( source_depth, dDdy, CV_16S , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
   //std::cout<<source_depth<<"\n";
-  //icp_vo.TrackJoint(source_depth,source_rgb, 0);
- // icp_vo.TrackJoint(target_depth,target_rgb, 1);
- /*
+  
+  //icp_vo.Track(source_depth,source_rgb, 0);
+  //icp_vo.Track(target_depth,target_rgb, 1);
+  /*
   Resolution::getInstance(640, 480);
   Intrinsics::getInstance(528, 528, 320, 240);
   std::cout<<"why??\n";

@@ -132,6 +132,52 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
 
   //std::cout<<"Cloud:\n"<<*pCurrentCloud<<"\n";
   //initialize VO if first frame, or track current frame
+  
+  if(true){
+    cv::Mat edge_map;
+    cv::Mat nan_map;
+    cv::Mat rej_map;
+    pICP->EdgeDetection(*pCurrentCloud, edge_map, nan_map, rej_map);
+    std::cout<<"\nedge MEAN: "<<cv::mean(edge_map).val[0];
+    std::string filename("depth_edge.txt");
+    std::ofstream file_out;
+    file_out.open(filename, std::ios_base::app | std::ios_base::in);
+    file_out << cv::mean(edge_map).val[0]<<"\n";
+    cv::Mat m2, depthCanny;
+    cv::normalize(depth, m2, 0, 255, cv::NORM_MINMAX);
+    m2.convertTo(m2, CV_8U);
+    cv::Canny(m2, depthCanny, 150, 100);
+
+    double depth_quality = cv::mean(depthCanny).val[0] / cv::mean(edge_map).val[0];
+    cv::Mat dIdx_quality;
+    cv::Mat dIdy_quality;
+    pICP->computeDerivativeImages(rgb, dIdx_quality, dIdy_quality);
+    cv::Mat final_edges_dI = cv::abs(dIdx_quality | dIdy_quality);
+    cv::Mat final_edges;
+    cv::Canny(rgb, final_edges, 150, 100);
+    /*
+    std::cout<<"\n\n"<<cv::mean(final_edges_dI).val[0]<<"\n";
+    std::cout<<"\n\n"<< cv::mean(final_edges).val[0]<<"\n";
+    */
+    double rgb_quality = cv::mean(final_edges).val[0] / cv::mean(final_edges_dI).val[0];
+    //std::cout<<"\n\n"<< ans<<"\n";
+    //cv::imwrite("rgb_edge_xy.jpg", final_edges);
+    //std::cout<<"\nMean: "<<cv::mean(final_edges).val[0];
+    std::string filename2("rgb_quality.txt");
+    std::ofstream file_out2;
+    file_out2.open(filename2, std::ios_base::app | std::ios_base::in);
+    //file_out2 << cv::mean(final_edges).val[0]<<"\n";
+    file_out2 <<rgb_quality<<"\n";
+
+    std::string filename3("depth_quality.txt");
+    std::ofstream file_out3;
+    file_out3.open(filename3, std::ios_base::app | std::ios_base::in);
+    //file_out2 << cv::mean(final_edges).val[0]<<"\n";
+    file_out3 <<depth_quality<<"\n";
+    pICP->rgb_quality = rgb_quality;
+    pICP->depth_quality = depth_quality;
+  }
+  
   if (mPoses.size() == 0) {
     rpK2C = RelativePose::Identity();
     pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pCurrentCloud), timestamp, Pose::Identity(), rgb);
@@ -163,6 +209,8 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
     cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
     rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
     //rpK2C = pICP->Register_Ori(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C);
+    //rpK2C = pICP->RegisterPure(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+    //rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
       pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*backupCloud.second), backupCloud.first, mPoses.back(), rgb);

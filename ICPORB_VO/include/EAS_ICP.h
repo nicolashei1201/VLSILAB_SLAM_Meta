@@ -52,6 +52,7 @@ public:
    *  @return: sampled cloud
    */
   const SourceCloud& EdgeAwareSampling(const Cloud& );
+  const SourceCloud& JustSampling(const Cloud& );
   const SourceCloud& EdgeAwareSampling(const Cloud&, const cv::Mat& );
   const SourceCloud& EdgeAwareSampling(const cv::Mat& );
   /*! Calculate transformation between two cloud.
@@ -63,6 +64,7 @@ public:
    */
   const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
   const Transform& Register_Ori(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
+  const Transform& RegisterPure(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
   const Transform& Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess);
   void RGBJacobianGet(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
   void RGBJacobianGetCorres(const cv::Mat& dIdx, const cv::Mat& dIdy, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last, const TargetCloud& tgtCloud, const Transform resultRt, A_term& A_rgb, b_term& b_rgb, TargetCloud& LastCloud);
@@ -85,8 +87,13 @@ public:
   cv::Mat last_depth;
   cv::Mat last_inten;
   cv::Mat next_depth;
+  cv::Mat dIdx;
+  cv::Mat dIdy;
+  double rgb_quality, depth_quality;
+  
 
   std::unique_ptr<CurrentCloud> pLastCloud;
+  void EdgeDetection(const Cloud& cloud, cv::Mat& edge_mat, cv::Mat& nan_mat, cv::Mat& rej_mat);
 private:
  
   //basic methods
@@ -100,7 +107,7 @@ private:
   std::unique_ptr<CurrentCloudrgb> keycloud_depth;
  CurrentCloud ComputeCurrentCloud(const cv::Mat& );
   //sampling methods
-  void EdgeDetection(const Cloud& cloud, cv::Mat& edge_mat, cv::Mat& nan_mat, cv::Mat& rej_mat);
+  
   void GeometryWeightingFunction(const cv::Mat& x, cv::Mat& out);
   void PointRejectionByDepthRangeAndGeometryWeight( const Cloud& cloud, const cv::Mat& edgeDistanceMat, const cv::Mat& rej_mat, std::vector<int>& , std::vector<double>& weights);
   void PointRejectionByDepthRangeAndGeometryWeight2( const Cloud& cloud, const cv::Mat& edgeDistanceMat, const cv::Mat& rej_mat, std::vector<int>& , std::vector<double>& weights);
@@ -117,11 +124,23 @@ private:
     
 	return depth.array()/ depth.array();
   }
+
+  void removeRow(Eigen::MatrixXd& matrix, unsigned int rowToRemove){
+    unsigned int numRows = matrix.rows()-1;
+    unsigned int numCols = matrix.cols();
+
+    if( rowToRemove < numRows )
+        matrix.block(rowToRemove,0,numRows-rowToRemove,numCols) = matrix.bottomRows(numRows-rowToRemove);
+
+    matrix.conservativeResize(numRows,numCols);
+  }
+
   void CalculateNormal(const Cloud& cloud, const std::vector<int>& sampling_inds, SourceCloud& srcCloud);
 
   //Matching methods
   bool MatchingByProject2DAndWalk(const SourceCloud& srcCloud, const TargetCloud& tgtCloud);
-
+  bool MatchingByProject2DAndWalkRANSAC(const SourceCloud& srcCloud, const TargetCloud& tgtCloud);
+  bool RANSAC_strategy(const SourceCloud& srcCloud, const TargetCloud& tgtCloud);
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetric(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetricGaussianNewton(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights);
   Eigen::Vector<EAS_ICP::Scalar, 6> MinimizingP2PLErrorMetricGaussianNewtonRGB(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& weights, const cv::Mat depth, const cv::Mat rgb, const cv::Mat rgb_last,Transform resultRt, TargetCloud& LastCloud);

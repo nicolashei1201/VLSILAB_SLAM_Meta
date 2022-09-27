@@ -158,6 +158,7 @@ if __name__=="__main__":
         print "absolute_translational_error.std %f m"%numpy.std(trans_error)
         print "absolute_translational_error.min %f m"%numpy.min(trans_error)
         print "absolute_translational_error.max %f m"%numpy.max(trans_error)
+	print "absolute_translational_error.max stamp %d"%numpy.argmax(trans_error)
     else:
         print "%f"%numpy.sqrt(numpy.dot(trans_error,trans_error) / len(trans_error))
         
@@ -170,6 +171,8 @@ if __name__=="__main__":
         file = open(args.save,"w")
         file.write("\n".join(["%f "%stamp+" ".join(["%f"%d for d in line]) for stamp,line in zip(second_stamps,second_xyz_full_aligned.transpose().A)]))
         file.close()
+
+        numpy.savetxt("ate_error.txt", trans_error)
 
     if args.plot:
         import matplotlib

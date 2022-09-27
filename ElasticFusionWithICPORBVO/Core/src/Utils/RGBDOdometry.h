@@ -24,7 +24,7 @@
 #include "../Cuda/cudafuncs.cuh"
 #include "OdometryProvider.h"
 #include "GPUConfig.h"
-
+#include <opencv2/opencv.hpp>
 #include <vector>
 #include <vector_types.h>
 
@@ -61,6 +61,8 @@ class RGBDOdometry
                                           const bool & so3);
 
         Eigen::MatrixXd getCovariance();
+        cv::Mat getlastImage();
+        cv::Mat getlastDepth();
 
         float lastICPError;
         float lastICPCount;

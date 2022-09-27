@@ -132,7 +132,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
 
   //std::cout<<"Cloud:\n"<<*pCurrentCloud<<"\n";
   //initialize VO if first frame, or track current frame
-  
+  float depth_mean;
   if(true){
     cv::Mat edge_map;
     cv::Mat nan_map;
@@ -143,6 +143,7 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
     std::ofstream file_out;
     file_out.open(filename, std::ios_base::app | std::ios_base::in);
     file_out << cv::mean(edge_map).val[0]<<"\n";
+    depth_mean = cv::mean(edge_map).val[0];
     cv::Mat m2, depthCanny;
     cv::normalize(depth, m2, 0, 255, cv::NORM_MINMAX);
     m2.convertTo(m2, CV_8U);
@@ -185,8 +186,10 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
 	keyframedepthmap = depth * mDepthMapFactor/1000;
   cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
   keyframeintenmap = inten;
+  /*
   pICP->last_rgb = rgb.clone();
   pICP->last_depth = depth.clone();
+  */
   //std::cout<<"keyframe:"<<keyframedepthmap<<"\n";
   } 
   else {
@@ -206,10 +209,32 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
     //perform ICP
 
     //std::cout<<cv::sum(keyframergbmap) - cv::sum(inten);
+    pICP->pLastCloud = std::make_unique<CurrentCloud>(ComputeCurrentCloud(pICP->last_depth));
+    if(depth_mean >1.0 && pICP->depth_quality > 1.0){
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pICP->pLastCloud), timestamp - 1, mPoses.back(), pICP->last_rgb);
+    }
+    else
+    {
+      pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->EdgeAwareSampling(*pICP->pLastCloud), timestamp - 1, mPoses.back(), pICP->last_rgb);
+      //pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->JustSampling(*pICP->pLastCloud), timestamp - 1, mPoses.back(), pICP->last_rgb);
+      //pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->JustSampling(*pICP->pLastCloud), timestamp - 1, mPoses.back(), pICP->last_rgb);
+    }
+    //pKeyFrame = std::make_unique<KeyFrame>(mPoses.size(), pICP->JustSampling(*pICP->pLastCloud), timestamp - 1, mPoses.back(), pICP->last_rgb);
+    keyframedepthmap = pICP->last_depth * mDepthMapFactor/1000;
+    keyframeintenmap = pICP->last_inten;
+
     cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
-    rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+    //rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
     //rpK2C = pICP->Register_Ori(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C);
-    //rpK2C = pICP->RegisterPure(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+     if(depth_mean >1.0 && pICP->depth_quality > 1.0){
+      rpK2C = pICP->Register(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+      //rpK2C = pICP->Register_EdgeAdd(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+    }
+    else
+    {
+      rpK2C = pICP->Register_EdgeAdd(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+      //rpK2C = pICP->RegisterPure(pKeyFrame->keyCloud, keyframedepthmap, rgb, *pCurrentCloud, predK2C, keyframeintenmap);
+    }
     //rpK2C = pICP->Register(pKeyFrame->keyCloud, *pCurrentCloud, predK2C);
     //check ICP valid
     if (bUseBackup && !pICP->isValid() && backupCloud.second != nullptr && mPoses.size() != pKeyFrame->id) {
@@ -236,9 +261,11 @@ const ICP_VO::Pose& ICP_VO::Track(const double& timestamp, const cv::Mat& rgb, c
 	  rpK2C = RelativePose::Identity();
 	  keyframedepthmap = depth * mDepthMapFactor/1000;
     keyframeintenmap = inten;
+    /*
     pICP->last_rgb = rgb.clone();
     pICP->last_inten = inten.clone();
     pICP->last_depth = depth.clone();
+    */
     }
     
     //backup cloud
@@ -537,5 +564,13 @@ void ICP_VO::computeDerivativeImages(const cv::Mat& rgb, cv::Mat& dIdx, cv::Mat&
   cv:: Sobel(intensity, dIdy, CV_32F, 0, 1, 1);
   //cv::filter2D( intensity, dIdy, -1 , kernelY, cv::Point( -1, -1 ), 0, cv::BORDER_DEFAULT);
   //std::cout<<dIdx;
+
+}
+void ICP_VO::TrackSource(const cv::Mat& rgb, const cv::Mat& depth){
+    cv::Mat inten;
+    cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
+    pICP->last_rgb = rgb.clone();
+    pICP->last_inten = inten.clone();
+    pICP->last_depth = depth.clone();
 
 }

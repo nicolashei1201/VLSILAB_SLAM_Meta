@@ -58,6 +58,7 @@ public:
    *  @param values: rgb image, depth image, timestamp
    */
   void IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
+  void IncrementalTrackSource(const cv::Mat& src_rgb, const cv::Mat& src_depth,const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
   void IncrementalTrackMeta(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
   void Track(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp);
   Poses FusionTwoTrajectory();

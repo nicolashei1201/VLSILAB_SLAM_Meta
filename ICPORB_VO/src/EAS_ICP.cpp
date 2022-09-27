@@ -85,7 +85,7 @@ const EAS_ICP::Transform& EAS_ICP::RegisterPure(const SourceCloud& srcCloud, con
   Transform initialGuess_I = Transform::Identity();
   Transform SO3Pose = SO3_prealign(initialGuess,rgb, 4);
   SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
-  rtSE3 = SO3Pose;
+  //rtSE3 = rtSE3;
   
   //cv::namedWindow("rgb_edge", cv::WINDOW_AUTOSIZE);
   
@@ -137,11 +137,11 @@ const EAS_ICP::Transform& EAS_ICP::RegisterPure(const SourceCloud& srcCloud, con
 	}
 	else{
 		//rt6D =MinimizingP2PLErrorMetricGaussianNewton(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
-		//rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		rt6D = MinimizingP2PLErrorMetric(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
 		
 		//convert 6D vector to SE3
-		rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloud);
-		iterRtSE3 = ConstructSE3_GN(rt6D);
+		//rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloud(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloud);
+		iterRtSE3 = ConstructSE3(rt6D);
 	}
     //chain iterRtSE3 to rtSE3
     rtSE3 = iterRtSE3 * rtSE3;
@@ -2545,15 +2545,15 @@ Eigen::Vector<EAS_ICP::Scalar, 6> EAS_ICP::MinimizingP2PLErrorMetricGaussianNewt
 	}
 	else{
 		//iterations_final = 1;
+			//double quality_rate = depth_quality/rgb_quality;
 			double quality_rate = depth_quality/rgb_quality;
-
-			iterations_final = 0.0001;
+			iterations_final = 0.0001 * rgb_quality;
 		
 		//wt = 1000;
 
 			
-			wt = 10 * quality_rate;
-			//wt = 10;
+			//wt = 10 * quality_rate;
+			wt = 10;
 			std::cout<<"\nquality rate: "<< depth_quality/rgb_quality<<"\n";
 			if(depth_quality == 0 || rgb_quality == 0){
 				wt = 10;
@@ -5129,4 +5129,1353 @@ bool EAS_ICP::MatchingByProject2DAndWalkRANSAC(const SourceCloud& srcCloud, cons
 
   //check the correspondence size over 6 for solving 6 rt valuables
   return corrs.rows() >=6;
+}
+const EAS_ICP::Transform& EAS_ICP::Register_EdgeAdd(const SourceCloud& srcCloud, const cv::Mat& depth, const cv::Mat& rgb, const TargetCloud& tgtCloud, const Transform& initialGuess, const cv::Mat& Last_intens) {
+
+  //initial parameters
+  std::cout<<"Meta Edge Add ICP\n";
+  long t1, t2;
+  t1 = clock();
+  //RANSAC_strategy(srcCloud,tgtCloud);
+  Transform initialGuess_I = Transform::Identity();
+  Transform SO3Pose = SO3_prealign(initialGuess,rgb, 4);
+  SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
+  //SO3Pose = SO3_prealign(SO3Pose,rgb, 1);
+  
+  rtSE3 = initialGuess;
+  rtSE3_1 = initialGuess;
+  rtSE3_2 = initialGuess;
+  rtSE3_3 = initialGuess;
+  rtSE3_4 = initialGuess;
+  
+  SourceCloud transformedCloudOri0(srcCloud.rows(), 6) ;
+  transformedCloudOri0.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+  transformedCloudOri0.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+  //kinectNoiseWeights = KinectNoiseWighting(transformedCloudOri0);
+  t2 = clock();
+  std::cout<<"\nSO3 time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+
+  MatchingByProject2DAndWalk(transformedCloudOri0, tgtCloud);
+  /*
+  t1 = clock();
+  RANSAC_strategy(transformedCloudOri0, tgtCloud);
+  Eigen::Vector<Scalar, 6> rt6D0;
+  rt6D0 = MinimizingP2PLErrorMetric(transformedCloudOri0(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+  Transform iterRtSE30;
+  iterRtSE30 = ConstructSE3(rt6D0);
+  rtSE3 = rtSE3 * iterRtSE30;
+  rtSE3_1 = rtSE3_1 * iterRtSE30;
+  rtSE3_2 = rtSE3_2 * iterRtSE30;
+  rtSE3_3 = rtSE3_3 * iterRtSE30;
+  rtSE3_4 = rtSE3_4 * iterRtSE30;
+  t2 = clock();
+  std::cout<<"\nRANSAC time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+  */
+ /*
+  rtSE3 = Transform::Identity();
+  rtSE3_1 = Transform::Identity();
+  rtSE3_2 = Transform::Identity();
+  rtSE3_3 = Transform::Identity();
+  rtSE3_4 = Transform::Identity();
+  */
+  int cnt_task1_large =0;
+  int cnt_task2_large =0;
+  int cnt_task3_large =0;
+  int cnt_task4_large =0;
+  iterations = 0;
+  accSlidingExtent = 0;
+  Useonlyforeground = 1;
+  Useweigtedrandomsampling = 1;
+  Useedgeaware = 0;
+  srand( time(NULL) );
+  int iteration_divide = 20;
+
+  last_inten = Last_intens;
+  t1 = clock();
+  computeDerivativeImages(last_rgb, dIdx, dIdy);
+  while (true) {
+  iterations+=1;
+  //meta training
+    /*double randomRGB = (double) rand() / (RAND_MAX + 1.0);
+	double randomdepth = (double) rand() / (RAND_MAX + 1.0);
+	std::cout<<"randomRGB"<<std::endl;
+	std::cout<<randomRGB<<std::endl;
+	std::cout<<"randomdepth"<<std::endl;
+	std::cout<<randomdepth<<std::endl;*/
+  //RGB ROI detection and transformed to pointcloud
+  //*********************************
+  //edge detection
+  cv::Mat nan_map;
+  cv::Mat rej_map;
+
+  //generate point cloud
+  keycloud = std::make_unique<CurrentCloudrgb>(ComputeCurrentCloud(depth));
+  //generate nan map& rej map
+  Eigen::MatrixX<Scalar> depth_map = Eigen::Map< const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> , Eigen::Unaligned, Eigen::Stride<1,3>> ((*keycloud).data()+2, (*keycloud).rows());
+  
+  nan_map = cv::Mat::zeros(height, width, CV_8UC1);
+  rej_map = cv::Mat::zeros(height, width, CV_8UC1);
+  uchar *nan_map1 = nan_map.data,
+           *rej_map1 = rej_map.data;
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+	    double point_z = depth_map(i*width+j, 0);
+      if (point_z != point_z) {
+        nan_map1[i*width + j] = 255;
+      }
+	    if (point_z >= max_depth  || point_z <= min_depth ) {
+        rej_map1[i*width + j] = 255;
+	    }
+    }
+  }
+  //canny edge
+  //read rgb files
+  cv::Mat src;
+  src = rgb;
+  //cv::Mat inten;
+  //cv::cvtColor(rgb, inten, cv::COLOR_BGR2GRAY);
+
+  cv::Mat canny_edge_map;
+  cv::Mat out_resized;
+  cv::Mat edge_map2;
+  cv::Mat edge_map_inner;
+  cv::Mat edge_map_outer;
+  cv::resize(src, out_resized, cv::Size(320, 240), cv::INTER_CUBIC);
+
+  cv::Mat blurred;
+  cv::blur(out_resized, blurred, cv::Size(3, 3));
+  //cv::blur(src, blurred, cv::Size(3, 3));
+  cv::Canny(blurred, canny_edge_map, 100, 150);
+  cv::resize(canny_edge_map, edge_map2, cv::Size(640, 480), cv::INTER_CUBIC);
+  //dilation
+  cv::Mat dilatemat1111 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11,11));
+  cv::Mat dilatemat99 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9,9));
+  cv::Mat dilatemat77 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+  cv::Mat dilatemat55 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
+  cv::Mat dilatemat33 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+
+  cv::dilate(edge_map2, edge_map_inner, dilatemat33);
+  //calculate edge distance map
+  
+  cv::Mat inv_edge_map_inner;
+  inv_edge_map_inner = ~edge_map_inner;
+  cv::Mat edge_distance_map_inner;
+  cv::distanceTransform(inv_edge_map_inner, edge_distance_map_inner, cv::DIST_L2, 5);
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds;
+  std::vector<double> weights;
+  std::vector<int> EASInds;
+  
+  /////////////////////////dilate outer
+
+ 
+  cv::dilate(edge_map2, edge_map_outer, dilatemat77);
+  //outer - inner 
+  cv::subtract(edge_map_outer, edge_map_inner, edge_map_outer);
+  //cv::imwrite("ROI_detection_rgb_dilateouter.png", edge_map_outer);
+  cv::Mat inv_edge_map_outer;
+  inv_edge_map_outer = ~edge_map_outer;
+  cv::Mat edge_distance_map_outer;
+  //cv::distanceTransform(inv_edge_map_outer, edge_distance_map_outer, cv::DIST_L2, 5);
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds2;
+  std::vector<double> weights2;
+  std::vector<int> EASInds2;
+
+  
+  //*********************************************
+  //Depth ROI detection and transformed to pointcloud
+  //*********************************
+  //edge detection
+  keycloud_depth = std::make_unique<CurrentCloudrgb>(ComputeCurrentCloud(depth));
+  cv::Mat edge_map_depth;
+  cv::Mat nan_map_depth;
+  cv::Mat rej_map_depth;
+  cv::Mat edge_map_inner_depth;
+  EdgeDetection(*keycloud_depth, edge_map_depth, nan_map_depth, rej_map_depth);
+
+  cv::dilate(edge_map_depth, edge_map_inner_depth, dilatemat33);
+  //cv::imwrite("ROI_detection_depth_inner.png", edge_map_inner_depth);
+  //calculate edge distance map
+  
+  cv::Mat inv_edge_map_inner_depth;
+  inv_edge_map_inner_depth = ~edge_map_inner_depth;
+  cv::Mat edge_distance_map_inner_depth;
+  cv::distanceTransform(inv_edge_map_inner_depth, edge_distance_map_inner_depth, cv::DIST_L2, 5);
+  
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds_depth;
+  std::vector<double> weights_depth;
+  std::vector<int> EASInds_depth;
+
+  
+  /////////////////////////dilate outer
+  //cv::Mat dilatemat = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+  cv::Mat edge_map_outer_depth;
+
+  cv::dilate(edge_map_depth, edge_map_outer_depth, dilatemat77);
+  //outer - inner 
+  cv::subtract(edge_map_outer_depth, edge_map_inner_depth, edge_map_outer_depth);
+  
+  cv::Mat inv_edge_map_outer_depth;
+  inv_edge_map_outer_depth = ~edge_map_outer_depth;
+  //cv::Mat edge_distance_map_outer_depth;
+  //cv::distanceTransform(inv_edge_map_outer_depth, edge_distance_map_outer_depth, cv::DIST_L2, 5);
+   
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds2_depth;
+  std::vector<double> weights2_depth;
+  std::vector<int> EASInds2_depth;
+  cv::Mat mapR1;
+  cv::Mat mapR2;
+  cv::Mat mapR3;
+  cv::Mat mapR4;
+  mapR1 = edge_map_inner_depth;
+  mapR2 = edge_map_outer_depth;
+  mapR3 = edge_map_inner;
+  mapR4 = edge_map_outer;
+  for(int i =0;i<mapR1.rows;i++)
+  {
+	for(int j =0;j<mapR1.cols;j++)
+	{
+		if((edge_map_inner.at<uchar>(i,j)>0)||(edge_map_outer.at<uchar>(i,j)>0))
+		{
+			mapR1.at<uchar>(i,j) = 0;
+		}		
+		if((edge_map_inner.at<uchar>(i,j)>0)||(edge_map_outer.at<uchar>(i,j)>0))
+		{
+			mapR2.at<uchar>(i,j) = 0;
+		}	
+		if((edge_map_inner_depth.at<uchar>(i,j)>0)||(edge_map_outer_depth.at<uchar>(i,j)>0))
+		{
+			mapR3.at<uchar>(i,j) = 0;
+		}	
+		if((edge_map_inner_depth.at<uchar>(i,j)>0)||(edge_map_outer_depth.at<uchar>(i,j)>0))
+		{
+			mapR4.at<uchar>(i,j) = 0;
+		}
+	}		
+  }
+  
+	  
+  //Before iteration 20
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, edge_map_inner, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, mapR3, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	
+	// 1st 
+	EASInds = remindPointInds;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds, mSrcCloud1_before20);
+	SourceCloud normal_samp;
+	normal_samp = JustSampling(*keycloud);
+	SourceCloud tmp(mSrcCloud1_before20.rows() + normal_samp.rows(), 6);
+	tmp << mSrcCloud1_before20, normal_samp;
+	mSrcCloud1_before20 = tmp;
+	//weighting
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, edge_map_outer, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, mapR4, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+
+	// 2nd 
+	EASInds2 = remindPointInds2;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2_before20);
+	normal_samp = JustSampling(*keycloud);
+	tmp.resize(mSrcCloud2_before20.rows() + normal_samp.rows(), 6);
+	tmp << mSrcCloud2_before20, normal_samp;
+	mSrcCloud2_before20 = tmp;
+	
+	//weighting
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, edge_map_inner_depth, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, mapR1, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	EASInds_depth = remindPointInds_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3_before20);
+	normal_samp = JustSampling(*keycloud);
+	tmp.resize(mSrcCloud3_before20.rows() + normal_samp.rows(), 6);
+	tmp << mSrcCloud3_before20, normal_samp;
+	mSrcCloud3_before20 = tmp;
+	//weighting
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, edge_map_outer_depth, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, mapR2, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	EASInds2_depth = remindPointInds2_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4_before20);
+	normal_samp = JustSampling(*keycloud);
+	tmp.resize(mSrcCloud4_before20.rows() + normal_samp.rows(), 6);
+	tmp << mSrcCloud4_before20, normal_samp;
+	mSrcCloud4_before20 = tmp;
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	
+	
+  //After iteration 20
+  //4 ROImap pixelwise OR 
+  cv::Mat ROI4OR;
+  //cv::bitwise_or(edge_map_inner_depth, edge_map_outer_depth, ROI4OR);
+  cv::bitwise_or(edge_map_inner, edge_map_outer, ROI4OR);
+  cv::bitwise_or(ROI4OR, edge_map_inner_depth, ROI4OR);
+  cv::bitwise_or(ROI4OR, edge_map_outer_depth, ROI4OR);
+  if(Useedgeaware==0)
+	{	  
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, ROI4OR, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	// 1st 
+	EASInds = remindPointInds;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds, mSrcCloud1);
+	//weighting
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+
+	// 2nd 
+	EASInds2 = remindPointInds2;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2);
+	//weighting
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	EASInds_depth = remindPointInds_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3);
+	//weighting
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	EASInds2_depth = remindPointInds2_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4);
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	}
+  else
+  {
+	// 1st 
+	cv::Mat InvEdgeMap;
+	cv::Mat EdgeDistanceMap;
+	InvEdgeMap = ~edge_map_depth;
+	cv::distanceTransform(InvEdgeMap, EdgeDistanceMap, cv::DIST_L2, 5);
+ 
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, EdgeDistanceMap, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+    CalculateNormal(*keycloud, EASInds, mSrcCloud1);
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+	
+	// 2nd 
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+		
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2);
+	
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+		
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3);
+		
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4);
+	
+	
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	}
+	kinectNoiseWeightsdepth_before20 = KinectNoiseWighting(mSrcCloud3_before20);
+	kinectNoiseWeightsdepth2_before20 = KinectNoiseWighting(mSrcCloud4_before20);
+	kinectNoiseWeightsrgb_before20 = KinectNoiseWighting(mSrcCloud1_before20);
+	kinectNoiseWeightsrgb2_before20 = KinectNoiseWighting(mSrcCloud2_before20);
+	kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	/*kinectNoiseWeightsdepth = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsdepth2 = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsrgb = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsrgb2 = KinectNoiseWighting(srcCloud);*/
+	//
+	
+	
+	
+	//sampling end
+	
+	
+    //transform depth source cloud by inital guess
+    //SourceCloud transformedCloud(srcCloud.rows(), 6) ;
+    //transformedCloud.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+    //transformedCloud.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+    SourceCloud transformedCloudrgb(mSrcCloud1.rows(), 6) ;
+	SourceCloud transformedCloudrgb2(mSrcCloud2.rows(), 6) ;
+	SourceCloud transformedClouddepth(mSrcCloud3.rows(), 6) ;
+	SourceCloud transformedClouddepth2(mSrcCloud4.rows(), 6) ;
+	SourceCloud transformedCloudrgb_before20(mSrcCloud1_before20.rows(), 6) ;
+	SourceCloud transformedCloudrgb2_before20(mSrcCloud2_before20.rows(), 6) ;
+	SourceCloud transformedClouddepth_before20(mSrcCloud3_before20.rows(), 6) ;
+	SourceCloud transformedClouddepth2_before20(mSrcCloud4_before20.rows(), 6) ;
+	/*SourceCloud transformedCloudrgb(srcCloud.rows(), 6) ;
+	SourceCloud transformedCloudrgb2(srcCloud.rows(), 6) ;
+	SourceCloud transformedClouddepth(srcCloud.rows(), 6) ;
+	SourceCloud transformedClouddepth2(srcCloud.rows(), 6) ;*/
+	if(Useedgeaware==0)
+	{
+		if(iterations<=iteration_divide)
+		{
+		//transform rgb source cloud by inital guess
+		transformedCloudrgb_before20.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1_before20.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb_before20.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1_before20.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2_before20.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2_before20.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2_before20.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2_before20.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth_before20.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3_before20.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth_before20.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3_before20.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2_before20.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4_before20.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2_before20.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4_before20.rightCols<3>().transpose()).transpose();
+		}	
+		
+		else
+		{
+		//transform rgb source cloud by inital guess
+		transformedCloudrgb.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.rightCols<3>().transpose()).transpose();
+		}
+	}
+	else
+	{
+		transformedCloudrgb.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.rightCols<3>().transpose()).transpose();
+		
+		//transform depth source cloud by inital guess
+		transformedClouddepth2.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.rightCols<3>().transpose()).transpose();
+    }	
+	
+	//TargetCloud LastCloud_1 = ((rtSE3_1.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+	//TargetCloud LastCloud_2 = ((rtSE3_2.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+	//TargetCloud LastCloud_3 = ((rtSE3_3.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+	//TargetCloud LastCloud_4 = ((rtSE3_4.topLeftCorner<3,3>()* pLastCloud->leftCols(3).transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+	
+	TargetCloud LastCloud_1 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_2 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_3 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_4 = ComputeCurrentCloud(last_depth);
+	//std::cout<<pLastCloud->leftCols(3);
+	int cnttrans1, cnttrans2, cnttrans3, cnttrans4;
+	cnttrans1 = 0;
+	cnttrans2 = 0;
+	cnttrans3 = 0;
+	cnttrans4 = 0;
+    int meanweight1, meanweight2, meanweight3, meanweight4;
+    double randomx_thres = 0.1;
+	if(Useweigtedrandomsampling==1)
+	{
+	  randomx_thres = 100;
+	}
+    //get iteration transformation by minimizing p2pl error metric
+
+    Eigen::Vector<Scalar, 6> rt6D;
+	
+    if(iterations<=iteration_divide)
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedClouddepth_before20, tgtCloud)) {
+			//std::cout<<"jump1"<<std::endl;
+			meanweight1 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedClouddepth_before20, tgtCloud)){
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all));
+			//rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all));
+			//std::cout<<"\ntransformedClouddepth_before20:\n"<<pLastCloud.rows()<<"\n\n";
+			//std::cout<<"\nCorres:\n"<<corrs<<"\n\n";
+			std::cout<<"hello~~~";
+			//RANSAC_strategy(transformedClouddepth_before20, tgtCloud);
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
+		}
+		else
+		{
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		}
+		}
+	}
+	else
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedClouddepth, tgtCloud)) {
+			//std::cout<<"jump1"<<std::endl;
+			meanweight1 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedClouddepth, tgtCloud)){
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D1 = MinimizingP2PLErrorMetric(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
+			//rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_1, LastCloud_1);
+		}
+		else
+		{
+			rt6D1 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth(corrs.col(0), Eigen::all));
+		}
+		}
+		//std::cout<<"cloudnumber"<<std::endl;
+		//std::cout<<mSrcCloud3.rows()<<std::endl;
+
+		meanweight1 = 1;
+	}
+    
+	if(iterations<=iteration_divide)
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)) {
+			//std::cout<<"jump2"<<std::endl;
+			meanweight2 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedClouddepth2_before20, tgtCloud)){
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
+			//rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all));
+			//RANSAC_strategy(transformedClouddepth2_before20, tgtCloud);
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_2, LastCloud_2);
+		}
+		else
+		{
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		}
+		}
+	}
+	else
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)) {
+			//std::cout<<"jump2"<<std::endl;
+			meanweight2 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedClouddepth2, tgtCloud)){
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D2 = MinimizingP2PLErrorMetric(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
+			//rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_2, LastCloud_2);
+		}
+		else
+		{
+			rt6D2 = MinimizingP2PLErrorMetricGaussianNewton(transformedClouddepth2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsdepth2(corrs.col(0), Eigen::all));
+		}
+		}	
+
+		meanweight2 = 1;
+	}
+
+
+	if(iterations<=iteration_divide)
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
+			//std::cout<<"jump3"<<std::endl;
+			meanweight3 =0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedCloudrgb_before20, tgtCloud)) {
+		//std::cout<<"cnttrans3"<<std::endl;
+		//std::cout<<cnttrans3<<std::endl;
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
+			//rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all));
+			//RANSAC_strategy(transformedCloudrgb_before20, tgtCloud);
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_3, LastCloud_3);
+		}	
+		else
+		{
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		}
+		meanweight3 = 1;
+		}
+	
+	}
+	else
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
+			//std::cout<<"jump3"<<std::endl;
+			meanweight3 =0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedCloudrgb, tgtCloud)) {
+
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D3 = MinimizingP2PLErrorMetric(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
+			//rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_3, LastCloud_3);
+		}	
+		else 
+		{
+			rt6D3 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb(corrs.col(0), Eigen::all));
+		}
+		meanweight3 = 1;
+		}
+	}
+	
+	if(iterations<=iteration_divide)
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
+			//std::cout<<"jump4"<<std::endl;
+			meanweight4 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedCloudrgb2_before20, tgtCloud)) {
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all));
+			//rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
+			//RANSAC_strategy(transformedCloudrgb2_before20, tgtCloud);
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2_before20(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2_before20(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
+		}
+		else
+		{
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+		}
+
+		meanweight4 = 1;
+		}
+	}
+	else
+	{
+		//match correspondence
+		if (!MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
+			//std::cout<<"jump4"<<std::endl;
+			meanweight4 = 0;
+		//break; // when correspondence size less than 6
+		}
+		if (MatchingByProject2DAndWalk(transformedCloudrgb2, tgtCloud)) {
+		//get iteration transformation by minimizing p2pl error metric
+		if(Useedgeaware==0)
+		{
+			//rt6D4 = MinimizingP2PLErrorMetric(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
+			//rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3_4, LastCloud_4);
+		}
+		else
+		{
+			rt6D4 = MinimizingP2PLErrorMetricGaussianNewton(transformedCloudrgb2(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeightsrgb2(corrs.col(0), Eigen::all));
+			
+		}
+		//std::cout<<"cnttrans4"<<std::endl;
+		//std::cout<<cnttrans4<<std::endl;
+		meanweight4 = 1;
+		}
+	}	
+	//std::cout<<"corrs4num"<<std::endl;
+	//std::cout<<corrs.rows()<<std::endl;
+	// ++ meta task loop end
+	// ++ pose fusion = mean(all tasks' rt6D)
+	
+	if((meanweight1+meanweight2+meanweight3+meanweight4)==0)
+	{
+		break;
+	}
+	/*else{
+
+    rt6D(0) = (rt6D1(0)*meanweight1+ rt6D2(0)*meanweight2 +rt6D3(0)*meanweight3 +rt6D4(0)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+	rt6D(1) = (rt6D1(1)*meanweight1+ rt6D2(1)*meanweight2 +rt6D3(1)*meanweight3 +rt6D4(1)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+    rt6D(2) = (rt6D1(2)*meanweight1+ rt6D2(2)*meanweight2 +rt6D3(2)*meanweight3 +rt6D4(2)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+	rt6D(3) = (rt6D1(3)*meanweight1+ rt6D2(3)*meanweight2 +rt6D3(3)*meanweight3 +rt6D4(3)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+	rt6D(4) = (rt6D1(4)*meanweight1+ rt6D2(4)*meanweight2 +rt6D3(4)*meanweight3 +rt6D4(4)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+	rt6D(5) = (rt6D1(5)*meanweight1+ rt6D2(5)*meanweight2 +rt6D3(5)*meanweight3 +rt6D4(5)*meanweight4)/(meanweight1+meanweight2+meanweight3+meanweight4);
+	}*/
+    //convert 6D vector to SE3
+    Eigen::Vector<Scalar, 6> rt6D_L1_largest;
+	double s1, s2, s3, s4;
+	
+	s1 = fabs(rt6D1(0))+fabs(rt6D1(1))+fabs(rt6D1(2));
+	s2 = fabs(rt6D2(0))+fabs(rt6D2(1))+fabs(rt6D2(2));
+	s3 = fabs(rt6D3(0))+fabs(rt6D3(1))+fabs(rt6D3(2));
+	s4 = fabs(rt6D4(0))+fabs(rt6D4(1))+fabs(rt6D4(2));
+	
+	/*
+	s1 = fabs(rt6D1(3))+fabs(rt6D1(4))+fabs(rt6D1(5));
+	s2 = fabs(rt6D2(4))+fabs(rt6D2(4))+fabs(rt6D2(5));
+	s3 = fabs(rt6D3(4))+fabs(rt6D3(4))+fabs(rt6D3(5));
+	s4 = fabs(rt6D4(4))+fabs(rt6D4(4))+fabs(rt6D4(5));
+	*/
+	if((s1>=s2)&&(s1>=s3)&&(s1>=s4))
+	{
+		std::cout<<"\n\nHAHSAHAH\n\n";
+		rt6D_L1_largest=rt6D1;
+		cnt_task1_large++;
+	}
+	if((s2>=s1)&&(s2>=s3)&&(s2>=s4))
+	{
+		rt6D_L1_largest=rt6D2;
+		cnt_task2_large++;
+	}
+	if((s3>=s2)&&(s3>=s1)&&(s3>=s4))
+	{
+		rt6D_L1_largest=rt6D3;
+		cnt_task3_large++;
+	}
+	if((s4>=s2)&&(s4>=s3)&&(s4>=s1))
+	{
+		rt6D_L1_largest=rt6D4;
+		cnt_task4_large;
+	}
+	
+	Transform iterRtSE3;
+	Transform Pre_RtSE3;
+	//Eigen::Vector3f Pre_trans(rt6D_L1_largest(0),rt6D_L1_largest(1),rt6D_L1_largest(2));
+	Eigen::Vector3f Pre_trans(rt6D_L1_largest(3),rt6D_L1_largest(4),rt6D_L1_largest(5));
+    iterRtSE3 = ConstructSE3_GN(rt6D_L1_largest);
+	//iterRtSE3 = ConstructSE3(rt6D_L1_largest);
+    //chain iterRtSE3 to rtSE3
+	std::cout<<iterRtSE3.col(3).head<3>().transpose()<<"\n";
+	std::cout<<"\npre: "<<Pre_trans;
+	std::cout<<"\nnorm: "<<Pre_trans.norm();
+	if(Pre_trans.norm() > 0.3){
+		rtSE3_1 = rtSE3_1;
+		rtSE3_2 = rtSE3_2;
+		rtSE3_3 = rtSE3_3;
+		rtSE3_4 = rtSE3_4;
+	}
+	else{
+    	rtSE3_1 = iterRtSE3 * rtSE3_1;
+		rtSE3_2 = iterRtSE3 * rtSE3_2;
+		rtSE3_3 = iterRtSE3 * rtSE3_3;
+		rtSE3_4 = iterRtSE3 * rtSE3_4;
+		rtSE3 = rtSE3 * iterRtSE3;
+	}
+    //chain iterRtSE3 to rtSE3
+    
+
+    //chain iterRtSE3 to rtSE3
+    
+
+    //chain iterRtSE3 to rtSE3
+    
+    //check termination
+    /*if (CheckConverged(rt6D) || iterations > max_iters) {
+      break;
+    }*/
+	max_iters = 30;
+	if (iterations > max_iters)
+	{
+		std::cout<<"4 tasks count"<<std::endl;
+		std::cout<<cnt_task1_large<<std::endl;
+		std::cout<<cnt_task2_large<<std::endl;
+		std::cout<<cnt_task3_large<<std::endl;
+		std::cout<<cnt_task4_large<<std::endl;		
+		break;
+	}
+  }
+  t2 = clock();
+  std::cout<<"\nMeta Training time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+  
+  
+  
+  //meta testing
+  //icp loop 2 START
+  iteration_loop2 = 0;
+  t1 = clock();
+  while (true) {
+  iteration_loop2+=1;
+  std::cout<<"\niter2: "<<iteration_loop2;
+  //RGB ROI detection and transformed to pointcloud
+  //*********************************
+  //edge detection
+  cv::Mat nan_map;
+  cv::Mat rej_map;
+  //generate point cloud
+  keycloud = std::make_unique<CurrentCloudrgb>(ComputeCurrentCloud(depth));
+  //generate nan map& rej map
+  Eigen::MatrixX<Scalar> depth_map = Eigen::Map< const Eigen::Matrix<Scalar, Eigen::Dynamic, 1> , Eigen::Unaligned, Eigen::Stride<1,3>> ((*keycloud).data()+2, (*keycloud).rows());
+  
+  nan_map = cv::Mat::zeros(height, width, CV_8UC1);
+  rej_map = cv::Mat::zeros(height, width, CV_8UC1);
+  uchar *nan_map1 = nan_map.data,
+           *rej_map1 = rej_map.data;
+  for (int i = 0; i < height; ++i) {
+    for (int j = 0; j < width; ++j) {
+	    double point_z = depth_map(i*width+j, 0);
+      if (point_z != point_z) {
+        nan_map1[i*width + j] = 255;
+      }
+	    if (point_z >= max_depth  || point_z <= min_depth ) {
+        rej_map1[i*width + j] = 255;
+	    }
+    }
+  }
+  //canny edge
+  //read rgb files
+  cv::Mat src;
+  src = rgb;
+  cv::Mat canny_edge_map;
+  cv::Mat out_resized;
+  cv::Mat edge_map2;
+  cv::Mat edge_map_inner;
+  cv::Mat edge_map_outer;
+  cv::resize(src, out_resized, cv::Size(320, 240), cv::INTER_CUBIC);
+
+  cv::Mat blurred;
+  cv::blur(out_resized, blurred, cv::Size(3, 3));
+  //cv::blur(src, blurred, cv::Size(3, 3));
+  cv::Canny(blurred, canny_edge_map, 100, 150);
+  cv::resize(canny_edge_map, edge_map2, cv::Size(640, 480), cv::INTER_CUBIC);
+  //dilation
+  cv::Mat dilatemat55 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
+  cv::Mat dilatemat33 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+  cv::dilate(edge_map2, edge_map_inner, dilatemat33);
+
+  //calculate edge distance map
+  
+  cv::Mat inv_edge_map_inner;
+  inv_edge_map_inner = ~edge_map_inner;
+  cv::Mat edge_distance_map_inner;
+  cv::distanceTransform(inv_edge_map_inner, edge_distance_map_inner, cv::DIST_L2, 5);
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds;
+  std::vector<double> weights;
+  std::vector<int> EASInds;
+  
+  /////////////////////////dilate outer
+  cv::Mat dilatemat99 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9,9));
+  cv::Mat dilatemat77 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+  cv::dilate(edge_map2, edge_map_outer, dilatemat77);
+  //outer - inner 
+  cv::subtract(edge_map_outer, edge_map_inner, edge_map_outer);
+  
+  cv::Mat inv_edge_map_outer;
+  inv_edge_map_outer = ~edge_map_outer;
+  cv::Mat edge_distance_map_outer;
+  //cv::distanceTransform(inv_edge_map_outer, edge_distance_map_outer, cv::DIST_L2, 5);
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds2;
+  std::vector<double> weights2;
+  std::vector<int> EASInds2;
+
+  
+  //*********************************************
+  //Depth ROI detection and transformed to pointcloud
+  //*********************************
+  //edge detection
+  keycloud_depth = std::make_unique<CurrentCloudrgb>(ComputeCurrentCloud(depth));
+  cv::Mat edge_map_depth;
+  cv::Mat nan_map_depth;
+  cv::Mat rej_map_depth;
+  cv::Mat edge_map_inner_depth;
+  EdgeDetection(*keycloud_depth, edge_map_depth, nan_map_depth, rej_map_depth);
+  
+  cv::dilate(edge_map_depth, edge_map_inner_depth, dilatemat33);
+  
+  //calculate edge distance map
+  
+  cv::Mat inv_edge_map_inner_depth;
+  inv_edge_map_inner_depth = ~edge_map_inner_depth;
+  cv::Mat edge_distance_map_inner_depth;
+  cv::distanceTransform(inv_edge_map_inner_depth, edge_distance_map_inner_depth, cv::DIST_L2, 5);
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds_depth;
+  std::vector<double> weights_depth;
+  std::vector<int> EASInds_depth;
+
+  
+  /////////////////////////dilate outer
+  //cv::Mat dilatemat = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+  cv::Mat edge_map_outer_depth;
+  cv::dilate(edge_map_depth, edge_map_outer_depth, dilatemat77);
+  //outer - inner 
+  cv::subtract(edge_map_outer_depth, edge_map_inner_depth, edge_map_outer_depth);
+  cv::Mat inv_edge_map_outer_depth;
+  inv_edge_map_outer_depth = ~edge_map_outer_depth;
+  //cv::Mat edge_distance_map_outer_depth;
+  //cv::distanceTransform(inv_edge_map_outer_depth, edge_distance_map_outer_depth, cv::DIST_L2, 5);
+   
+  //reject the points out of range and weight remind points for random sampling
+  std::vector<int> remindPointInds2_depth;
+  std::vector<double> weights2_depth;
+  std::vector<int> EASInds2_depth;
+  cv::Mat mapR1;
+  cv::Mat mapR2;
+  cv::Mat mapR3;
+  cv::Mat mapR4;
+  mapR1 = edge_map_inner_depth;
+  mapR2 = edge_map_outer_depth;
+  mapR3 = edge_map_inner;
+  mapR4 = edge_map_outer;
+  for(int i =0;i<mapR1.rows;i++)
+  {
+	for(int j =0;j<mapR1.cols;j++)
+	{
+		if((edge_map_inner.at<uchar>(i,j)>0)||(edge_map_outer.at<uchar>(i,j)>0))
+		{
+			mapR1.at<uchar>(i,j) = 0;
+		}		
+		if((edge_map_inner.at<uchar>(i,j)>0)||(edge_map_outer.at<uchar>(i,j)>0))
+		{
+			mapR2.at<uchar>(i,j) = 0;
+		}	
+		if((edge_map_inner_depth.at<uchar>(i,j)>0)||(edge_map_outer_depth.at<uchar>(i,j)>0))
+		{
+			mapR3.at<uchar>(i,j) = 0;
+		}	
+		if((edge_map_inner_depth.at<uchar>(i,j)>0)||(edge_map_outer_depth.at<uchar>(i,j)>0))
+		{
+			mapR4.at<uchar>(i,j) = 0;
+		}
+	}		
+  }
+  
+  //Before iteration 20
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, edge_map_inner, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, mapR3, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	
+	// 1st 
+	EASInds = remindPointInds;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds, mSrcCloud1_before20);
+	//weighting
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, edge_map_outer, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, mapR4, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+
+	// 2nd 
+	EASInds2 = remindPointInds2;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2_before20);
+	//weighting
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, edge_map_inner_depth, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, mapR1, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	EASInds_depth = remindPointInds_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3_before20);
+	//weighting
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	//PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, edge_map_outer_depth, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, mapR2, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	EASInds2_depth = remindPointInds2_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4_before20);
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	
+	
+  //After iteration 20
+  //4 ROImap pixelwise OR 
+  cv::Mat ROI4OR;
+  //cv::bitwise_or(edge_map_inner_depth, edge_map_outer_depth, ROI4OR);
+  cv::bitwise_or(edge_map_inner, edge_map_outer, ROI4OR);
+  cv::bitwise_or(ROI4OR, edge_map_inner_depth, ROI4OR);
+  cv::bitwise_or(ROI4OR, edge_map_outer_depth, ROI4OR);
+  if(Useedgeaware==0)
+	{	  
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, ROI4OR, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	// 1st 
+	EASInds = remindPointInds;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds, mSrcCloud1);
+	//weighting
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+
+	// 2nd 
+	EASInds2 = remindPointInds2;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2);
+	//weighting
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	EASInds_depth = remindPointInds_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3);
+	//weighting
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, ROI4OR, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	EASInds2_depth = remindPointInds2_depth;
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	//calculate normal
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4);
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	}
+  else
+  {
+	// 1st 
+	cv::Mat InvEdgeMap;
+	cv::Mat EdgeDistanceMap;
+	InvEdgeMap = ~edge_map_depth;
+	cv::distanceTransform(InvEdgeMap, EdgeDistanceMap, cv::DIST_L2, 5);
+ 
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, EdgeDistanceMap, nan_map_depth| rej_map_depth, remindPointInds, weights);
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds, weights, EASInds);
+	}
+    CalculateNormal(*keycloud, EASInds, mSrcCloud1);
+	//kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds2, weights2);
+	
+	// 2nd 
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2, weights2, EASInds2);
+	}
+		
+	CalculateNormal(*keycloud, EASInds2, mSrcCloud2);
+	
+	//kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	//3rd
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds_depth, weights_depth);
+  
+	// 1st sample all points 
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds_depth, weights_depth, EASInds_depth);
+	}
+		
+	CalculateNormal(*keycloud_depth, EASInds_depth, mSrcCloud3);
+		
+	//kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	// 4th
+	PointRejectionByDepthRangeAndGeometryWeight2(*keycloud_depth, EdgeDistanceMap, nan_map_depth | rej_map_depth, remindPointInds2_depth, weights2_depth);
+
+	
+	if(Useweigtedrandomsampling==1)
+	{
+		WeightedRandomSampling(sampling_size, remindPointInds2_depth, weights2_depth, EASInds2_depth);
+	}
+	
+	CalculateNormal(*keycloud_depth, EASInds2_depth, mSrcCloud4);
+	
+	
+	//weighting
+	//kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	}
+	kinectNoiseWeightsdepth_before20 = KinectNoiseWighting(mSrcCloud3_before20);
+	kinectNoiseWeightsdepth2_before20 = KinectNoiseWighting(mSrcCloud4_before20);
+	kinectNoiseWeightsrgb_before20 = KinectNoiseWighting(mSrcCloud1_before20);
+	kinectNoiseWeightsrgb2_before20 = KinectNoiseWighting(mSrcCloud2_before20);
+	kinectNoiseWeightsdepth = KinectNoiseWighting(mSrcCloud3);
+	kinectNoiseWeightsdepth2 = KinectNoiseWighting(mSrcCloud4);
+	kinectNoiseWeightsrgb = KinectNoiseWighting(mSrcCloud1);
+	kinectNoiseWeightsrgb2 = KinectNoiseWighting(mSrcCloud2);
+	/*kinectNoiseWeightsdepth = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsdepth2 = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsrgb = KinectNoiseWighting(srcCloud);
+	kinectNoiseWeightsrgb2 = KinectNoiseWighting(srcCloud);*/
+	//
+	
+	
+	
+	//sampling end
+	
+	
+    //transform depth source cloud by inital guess
+    //SourceCloud transformedCloud(srcCloud.rows(), 6) ;
+    //transformedCloud.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* srcCloud.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+    //transformedCloud.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* srcCloud.rightCols<3>().transpose()).transpose();
+    SourceCloud transformedCloudrgb(mSrcCloud1.rows(), 6) ;
+	SourceCloud transformedCloudrgb2(mSrcCloud2.rows(), 6) ;
+	SourceCloud transformedClouddepth(mSrcCloud3.rows(), 6) ;
+	SourceCloud transformedClouddepth2(mSrcCloud4.rows(), 6) ;
+	SourceCloud transformedCloudrgb_before20(mSrcCloud1_before20.rows(), 6) ;
+	SourceCloud transformedCloudrgb2_before20(mSrcCloud2_before20.rows(), 6) ;
+	SourceCloud transformedClouddepth_before20(mSrcCloud3_before20.rows(), 6) ;
+	SourceCloud transformedClouddepth2_before20(mSrcCloud4_before20.rows(), 6) ;
+	/*SourceCloud transformedCloudrgb(srcCloud.rows(), 6) ;
+	SourceCloud transformedCloudrgb2(srcCloud.rows(), 6) ;
+	SourceCloud transformedClouddepth(srcCloud.rows(), 6) ;
+	SourceCloud transformedClouddepth2(srcCloud.rows(), 6) ;*/
+	if(Useedgeaware==0)
+	{
+		if(iteration_loop2<=iteration_divide)
+		{
+		//transform rgb source cloud by inital guess
+		transformedCloudrgb_before20.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud1_before20.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedCloudrgb_before20.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud1_before20.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2_before20.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud2_before20.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedCloudrgb2_before20.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud2_before20.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth_before20.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud3_before20.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedClouddepth_before20.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud3_before20.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2_before20.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud4_before20.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedClouddepth2_before20.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud4_before20.rightCols<3>().transpose()).transpose();
+		
+		/*//transform rgb source cloud by inital guess
+		transformedCloudrgb_before20.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* transformedCloudrgb_before20.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb_before20.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* transformedCloudrgb_before20.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2_before20.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* transformedCloudrgb2_before20.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2_before20.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* transformedCloudrgb2_before20.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth_before20.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* transformedClouddepth_before20.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth_before20.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* transformedClouddepth_before20.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2_before20.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* transformedClouddepth2_before20.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2_before20.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* transformedClouddepth2_before20.rightCols<3>().transpose()).transpose();
+		*/}	
+		
+		else
+		{
+		//transform rgb source cloud by inital guess
+		transformedCloudrgb.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud1.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedCloudrgb.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud1.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud2.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedCloudrgb2.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud2.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud3.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedClouddepth.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud3.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* mSrcCloud4.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+		transformedClouddepth2.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* mSrcCloud4.rightCols<3>().transpose()).transpose();
+		
+		/*//transform rgb source cloud by inital guess
+		transformedCloudrgb.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* transformedCloudrgb.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* transformedCloudrgb.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* transformedCloudrgb2.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* transformedCloudrgb2.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* transformedClouddepth.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* transformedClouddepth.rightCols<3>().transpose()).transpose();
+    
+		//transform depth source cloud by inital guess
+		transformedClouddepth2.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* transformedClouddepth2.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* transformedClouddepth2.rightCols<3>().transpose()).transpose();
+		*/}
+	}
+	else
+	{
+		transformedCloudrgb.leftCols(3) = ((rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.leftCols<3>().transpose()).colwise() + rtSE3_3.col(3).head<3>()).transpose();
+		transformedCloudrgb.rightCols(3) = (rtSE3_3.topLeftCorner<3,3>()* mSrcCloud1.rightCols<3>().transpose()).transpose();
+		//transform rgb cloud cloud by initial guess
+		transformedCloudrgb2.leftCols(3) = ((rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.leftCols<3>().transpose()).colwise() + rtSE3_4.col(3).head<3>()).transpose();
+		transformedCloudrgb2.rightCols(3) = (rtSE3_4.topLeftCorner<3,3>()* mSrcCloud2.rightCols<3>().transpose()).transpose();
+		//transform depth source cloud by inital guess
+		transformedClouddepth.leftCols(3) = ((rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.leftCols<3>().transpose()).colwise() + rtSE3_1.col(3).head<3>()).transpose();
+		transformedClouddepth.rightCols(3) = (rtSE3_1.topLeftCorner<3,3>()* mSrcCloud3.rightCols<3>().transpose()).transpose();
+		
+		//transform depth source cloud by inital guess
+		transformedClouddepth2.leftCols(3) = ((rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.leftCols<3>().transpose()).colwise() + rtSE3_2.col(3).head<3>()).transpose();
+		transformedClouddepth2.rightCols(3) = (rtSE3_2.topLeftCorner<3,3>()* mSrcCloud4.rightCols<3>().transpose()).transpose();
+    }
+
+	TargetCloud LastCloud_1 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_2 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_3 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloud_4 = ComputeCurrentCloud(last_depth);
+	TargetCloud LastCloudOri = ComputeCurrentCloud(last_depth);
+
+	int cnttrans1, cnttrans2, cnttrans3, cnttrans4;
+	cnttrans1 = 0;
+	cnttrans2 = 0;
+	cnttrans3 = 0;
+	cnttrans4 = 0;
+    int meanweight1, meanweight2, meanweight3, meanweight4;
+    double randomx_thres = 0.1;
+	if(Useweigtedrandomsampling==1)
+	{
+	  randomx_thres = 100;
+	}
+   
+    Eigen::Vector<Scalar, 6> rt6D;
+
+    SourceCloud tmp;
+	SourceCloud normal_samp;
+	SourceCloud transformedCloudOri(srcCloud.rows(), 6) ;
+	normal_samp = JustSampling(*keycloud);
+	tmp.resize(srcCloud.rows() + normal_samp.rows(), 6);
+	tmp << srcCloud, normal_samp;
+	transformedCloudOri.resize(tmp.rows(), 6);
+	transformedCloudOri = tmp;
+	kinectNoiseWeights = KinectNoiseWighting(transformedCloudOri);
+
+    transformedCloudOri.leftCols(3) = ((rtSE3.topLeftCorner<3,3>()* transformedCloudOri.leftCols<3>().transpose()).colwise() + rtSE3.col(3).head<3>()).transpose();
+    transformedCloudOri.rightCols(3) = (rtSE3.topLeftCorner<3,3>()* transformedCloudOri.rightCols<3>().transpose()).transpose();
+	if (!MatchingByProject2DAndWalk(transformedCloudOri, tgtCloud)) {
+		break; // when correspondence size less than 6
+		}
+	/*
+	if(iteration_loop2 == 1){
+		RANSAC_strategy(transformedCloudOri, tgtCloud);
+	}
+	*/
+	std::cout<<"\ncorrs: "<<corrs.rows();
+	//rt6D = rt6D1;
+	rt6D = MinimizingP2PLErrorMetric(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all), kinectNoiseWeights(corrs.col(0), Eigen::all));
+	//rt6D = MinimizingP2PLErrorMetricGaussianNewtonRGB(transformedCloudOri(corrs.col(0), Eigen::all), tgtCloud(corrs.col(1), Eigen::all),  kinectNoiseWeights(corrs.col(0), Eigen::all), depth ,rgb, last_rgb, rtSE3, LastCloudOri);
+    Transform iterRtSE3;
+	Eigen::Vector3f Pre_trans(rt6D(0),rt6D(1),rt6D(2));
+
+    iterRtSE3 = ConstructSE3(rt6D);
+
+    //chain iterRtSE3 to rtSE3
+    //rtSE3 = iterRtSE3 * rtSE3;
+	std::cout<<iterRtSE3.col(3).head<3>().transpose()<<"\n";
+	std::cout<<"\npre: "<<Pre_trans;
+	std::cout<<"\nnorm: "<<Pre_trans.norm();
+	if(Pre_trans.norm() > 0.3){
+		rtSE3 = rtSE3;
+	}
+	else{
+		rtSE3 = rtSE3 * iterRtSE3;
+	}
+    //check termination
+    /*if (CheckConverged(rt6D) || iterations > max_iters) {
+      break;
+    }*/
+	max_iters = 20;
+	if (iteration_loop2 > max_iters)
+	{
+		break;
+	}
+  }
+  t2 = clock();
+  std::cout<<"\nMeta Testing time: "<<(t2-t1)/(double)CLOCKS_PER_SEC<<"\n";
+  valid = true;
+  return rtSE3;
 }

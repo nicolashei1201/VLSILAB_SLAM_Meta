@@ -103,6 +103,7 @@ public:
   const Pose& Track(const double& timestamp, const cv::Mat& rgb);
   const Pose& Track(const double& timestamp);
   const Pose& Track(const double& timestamp, const cv::Mat& rgb, const cv::Mat& depth);
+  void TrackSource(const cv::Mat& rgb, const cv::Mat& depth);
   const Poses& GetPoses(){
     return mPoses;
   }

@@ -614,3 +614,24 @@ Eigen::MatrixXd RGBDOdometry::getCovariance()
 {
     return lastA.cast<double>().lu().inverse();
 }
+cv::Mat RGBDOdometry::getlastImage()
+{
+    //DeviceArray2D<unsigned char> test = lastImage[2];
+    
+    cv::Mat testing;
+    testing = cv::Mat( 480, 640,CV_8UC1);
+    //std::cout<<"\nimage stride:"<<testing.step<<"\n";
+    //lastImage[0].download(testing.data, 640);
+    lastImage[0].download(testing.data, 640);
+    return testing;
+}
+cv::Mat RGBDOdometry::getlastDepth()
+{
+    //DeviceArray2D<unsigned char> test = lastImage[2];
+    
+    cv::Mat testing;
+    testing = cv::Mat( 480, 640,CV_32F);
+    std::cout<<"\nimage stride:"<<testing.step<<"\n";
+    lastDepth[0].download(testing.data, 2560);
+    return testing;
+}

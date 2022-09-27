@@ -63,6 +63,7 @@ public:
    *  @return: transformation
    */
   const Transform& Register(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
+  const Transform& Register_EdgeAdd(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
   const Transform& Register_Ori(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess);
   const Transform& RegisterPure(const SourceCloud& srcCloud, const cv::Mat&, const cv::Mat& , const TargetCloud& tgtCloud, const Transform& initialGuess,  const cv::Mat& Last_intens);
   const Transform& Register(const SourceCloud& srcCloud, const TargetCloud& tgtCloud, const Transform& initialGuess);

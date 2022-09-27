@@ -34,7 +34,7 @@ void main()
     {
         vData.xyz = vPosition0[0].xyz;
         vData.w = vColorTime0[0].z;
-        //EmitVertex();
+        EmitVertex();
         EndPrimitive(); 
     }
 }

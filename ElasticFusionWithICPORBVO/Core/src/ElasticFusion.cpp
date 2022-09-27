@@ -323,7 +323,29 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, filtered_cloud.leftCols<3>().cast<double>(),timestamp);
 //printf("odom");
         std::cout<<"Increment\n";
-        icporb_vo->IncrementalTrack(cvRGB, cvDepth,(double)timestamp/1000);
+
+        frameToModel.initICPModel(shouldFillIn ? &fillIn.vertexTexture : indexMap.vertexTex(),
+                                      shouldFillIn ? &fillIn.normalTexture : indexMap.normalTex(),
+                                      maxDepthProcessed, currPose);
+        frameToModel.initRGBModel((shouldFillIn || frameToFrameRGB) ? &fillIn.imageTexture : indexMap.imageTex());
+        frameToModel.initICP(textures[GPUTexture::DEPTH_FILTERED], maxDepthProcessed);
+        frameToModel.initRGB(textures[GPUTexture::RGB]);
+
+        cv::Mat src_depth;
+        cv::Mat src_rgb;
+
+        src_rgb = frameToModel.getlastImage();
+        src_depth = frameToModel.getlastDepth();
+        src_depth = src_depth * 1000;
+        src_depth.convertTo(src_depth, CV_16UC1, 1);
+        cv::Mat cvsrcDepth(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_16UC1, src_depth.data);
+        //cv::Mat cvsrcRGB(Resolution::getInstance().height(), Resolution::getInstance().width(), CV_8UC3, src_rgb.data);
+        cv::Mat cvsrcRGB;
+        cv::cvtColor(src_rgb, cvsrcRGB, cv::COLOR_GRAY2BGR);
+        //cv::imshow("last image", cvsrcRGB);
+        //cv::waitKey(1);
+        //icporb_vo->IncrementalTrack(cvRGB, cvDepth,(double)timestamp/1000);
+        icporb_vo->IncrementalTrackSource(cvsrcRGB, cvsrcDepth, cvRGB, cvDepth,(double)timestamp/1000);
         // icporb_vo->IncrementalTrack(cvRGB, cvDepth, timestamp);
         std::cout<<"Increment End\n";
         TOCK("odom");
@@ -335,8 +357,8 @@ void ElasticFusion::processFrame(const unsigned char * rgb,
            //currPose = icporb_vo->GetCurrentPose(1).matrix().cast<float>();
         } else {
         
-          currPose = currPose * icporb_vo->GetRelativePose(1).matrix().cast<float>();
-          // currPose = icporb_vo->GetCurrentPose(1).matrix().cast<float>();
+            currPose = lastPose * icporb_vo->GetRelativePose(1).matrix().cast<float>();
+           //currPose = icporb_vo->GetCurrentPose(0).matrix().cast<float>();
         }
         
       } else {

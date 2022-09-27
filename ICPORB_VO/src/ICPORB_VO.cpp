@@ -293,6 +293,23 @@ void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const
 void ICPORB_VO::IncrementalTrack(const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
 
   ICP_VO::Pose TICP = pICPVO->Track(depth, rgb, timestamp);
+  pICPVO->TrackSource(rgb, depth);
+  //convert Matrix4d to Isometry
+  Pose PICP(TICP);
+  std::cout<<"get ICP pose\n"<<TICP;
+  //fuse both trajectory
+  posesICP.push_back(PICP);
+  int n = 2;
+  if (posesICP.size() == 1) {
+    currentPose = Pose::Identity();
+    lastPose = Pose::Identity();
+  } 
+}
+void ICPORB_VO::IncrementalTrackSource(const cv::Mat& src_rgb, const cv::Mat& src_depth,const cv::Mat& rgb, const cv::Mat& depth, const double& timestamp) {
+
+  pICPVO->TrackSource(src_rgb, src_depth);
+  ICP_VO::Pose TICP = pICPVO->Track(depth, rgb, timestamp);
+  pICPVO->TrackSource(rgb, depth);
   //convert Matrix4d to Isometry
   Pose PICP(TICP);
   std::cout<<"get ICP pose\n"<<TICP;
